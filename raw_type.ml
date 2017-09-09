@@ -41,11 +41,12 @@ let rec of_type (ty:Type.t) : t =
         collect args (of_type arg :: accu)
     in
     collect args []
+  | `App (`Prim prim, []) -> of_type prim.prim_type
   | _ -> Printf.printf "type = %s\n" (Type.to_string ty);
-    failwith "not supported"
+    failwith "of_type: not supported"
 
 let rec to_string = function
-  | Void -> ""
+  | Void -> "Void"
   | Bool -> "bool"
   | Uint -> "uint"
   | Uint8 -> "uint8"
@@ -67,8 +68,7 @@ let rec to_string = function
       match args with
       | [] -> ()
       | arg :: [] ->
-        add_string buf @@ to_string arg;
-        add_args [arg]
+        add_string buf @@ to_string arg
       | arg :: args ->
         add_string buf @@ to_string arg;
         add_string buf ", ";
@@ -76,7 +76,7 @@ let rec to_string = function
     in
     add_string buf "func (";
     add_args args;
-    add_string buf " ";
+    add_string buf ") ";
     add_string buf @@ to_string ret;
     contents buf
   | _ -> failwith "not impl"

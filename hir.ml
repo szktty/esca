@@ -35,7 +35,7 @@ module Op = struct
   and call = {
     call_fun : t;
     call_args : t list;
-    (*call_ty : Type.t;*)
+    call_ty : Type.t;
   }
 
   and block = {
@@ -172,7 +172,9 @@ module Compiler = struct
         List.map call.fc_args
           ~f:(fun arg -> compile_node' ctx arg)
       in
-      ctx, Call { call_fun = fun_op; call_args = arg_ops }
+      ctx, Call { call_fun = fun_op;
+                  call_args = arg_ops;
+                  call_ty = Type.unit }
 
     | `Var var ->
       Printf.printf "HIR: compile var\n";

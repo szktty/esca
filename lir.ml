@@ -2,22 +2,6 @@
 
 open Core
 
-module Type = struct
-
-  type interface = unit (* TODO *)
-
-  type t =
-    | Bool
-    | Int
-    | Float
-    | String
-    | Error
-    | Ptr of t
-    | Interface of interface
-    | Custom of string
-
-end
-
 type register = string
 
 module Op = struct
@@ -38,7 +22,7 @@ module Op = struct
     | Block of t list
     | Terminal
     | Var of var
-    | Prim of register * string
+    | Prim of primitive
     | Null
     | Bool of bool
     | Int of int
@@ -60,8 +44,15 @@ module Op = struct
 
   and call = {
     call_rc : register;
+    call_ty : Raw_type.t;
     call_fun : register;
     call_args : register list;
+  }
+
+  and primitive = {
+    prim_rc : register;
+    prim_name : string;
+    prim_ty : Raw_type.t;
   }
 
 end
@@ -76,6 +67,11 @@ module Program = struct
     top : Op.fundef;
     subs : Op.fundef list; (* TODO *)
   }
+
+  let basic_pkgs = [
+    "base";
+    "lib/kernel";
+  ]
 
   let create ~src ~out ~pkg ~vars ~top ~subs =
     { src; out; pkg; vars; top; subs }
@@ -93,7 +89,10 @@ module Program = struct
     write_pkg buf prog;
     write_import buf prog;
     write_fun buf prog.top;
+    let code = contents buf in
     Printf.printf "golang = %s\n" (contents buf);
+    Printf.printf "out = %s\n" prog.out;
+    Out_channel.write_all prog.out ~data:code;
     ()
 
   and write_pkg buf prog =
@@ -105,9 +104,9 @@ module Program = struct
   and write_import buf prog =
     let open Buffer in
     add_string buf "import (\n";
-    List.iter []
+    List.iter basic_pkgs
       ~f:(fun pkg ->
-          add_string buf @@ sprintf "\"%s/%s\"\n" !Config.runlib_path pkg);
+          add_string buf @@ sprintf ". \"%s/%s\"\n" !Config.runlib_path pkg);
     add_string buf ")\n\n"
 
   and write_op buf (op:Op.t) =
@@ -122,13 +121,19 @@ module Program = struct
     match op with
     | Call call ->
       Printf.printf "call\n";
-      add @@ sprintf "%s := %s(" call.call_rc call.call_fun;
+      add @@ sprintf "var %s %s = %s("
+        call.call_rc
+        (Raw_type.to_string call.call_ty)
+        call.call_fun;
       add @@ String.concat ~sep:"," call.call_args;
       addln ")";
 
-    | Prim (rc, name) ->
-      let bridge = bridge_prim_name name in
-      addln @@ sprintf "%s := %s" rc bridge
+    | Prim prim ->
+      let bridge = bridge_prim_name prim.prim_name in
+      addln @@ sprintf "var %s %s = %s"
+        prim.prim_rc
+        (Raw_type.to_string prim.prim_ty)
+        bridge
 
     | Null -> add "null"
     | String (rc, value) ->
@@ -144,7 +149,9 @@ module Program = struct
     add_string buf "func ";
     add_string buf func.fdef_name;
     add_string buf "() ";
-    add_string buf @@ Raw_type.to_string func.fdef_ret;
+    if func.fdef_name <> "main" then begin
+      add_string buf @@ Raw_type.to_string func.fdef_ret;
+    end;
     add_string buf " {\n";
     write_ops buf func.fdef_body;
     add_string buf "}\n";
@@ -239,11 +246,16 @@ module Compiler = struct
               ctx.rc :: rcs)
       in
       add ctx @@ Call { call_rc = new_rc ctx;
+                        call_ty = Raw_type.of_type call.call_ty;
                         call_fun = f_rc;
                         call_args = List.rev rev_rcs }
 
     | Prim prim ->
-      add ctx @@ Prim (new_rc ctx, prim.prim_name)
+      add ctx @@ Prim {
+        prim_rc = new_rc ctx;
+        prim_name = prim.prim_name;
+        prim_ty = Raw_type.of_type prim.prim_ty;
+      }
 
     | Var var ->
       Printf.printf "compile var\n";
@@ -279,7 +291,7 @@ module Compiler = struct
     let top = compile_clos ctx prog.clos in
     let prog = Program.create
         ~src:prog.file
-        ~out:(prog.file^".go")
+        ~out:((Filename.chop_extension prog.file) ^".go")
         ~pkg:None
         ~vars:[]
         ~top

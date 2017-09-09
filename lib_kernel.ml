@@ -13,7 +13,7 @@ let init () =
                 +> typ "box" Type.box_gen
                 +> typ "stream" Type.stream
                 +> fun_ "id" Type.Spec.(a @-> a)
-                +> fun_ "print" Type.Spec.(string @-> string)
+                +> fun_ "print" Type.Spec.(string @-> unit)
                 +> fun_ "printf" Type.Spec.fun_printf
                 +> string "version"
                 |> end_);
