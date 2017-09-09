@@ -1,3 +1,3 @@
-package esca
+package types
 
 type Void struct{}
