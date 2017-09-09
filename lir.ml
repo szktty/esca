@@ -118,26 +118,33 @@ module Program = struct
       add s;
       ln 1
     in
+    let with_var name ty ~f =
+      add @@ sprintf "var %s %s = " name (Raw_type.to_string ty);
+      f buf;
+      addln "";
+      addln @@ sprintf "var _ = %s" name
+    in
+
     match op with
     | Call call ->
       Printf.printf "call\n";
-      add @@ sprintf "var %s %s = %s("
-        call.call_rc
-        (Raw_type.to_string call.call_ty)
-        call.call_fun;
-      add @@ String.concat ~sep:"," call.call_args;
-      addln ")";
+      with_var call.call_rc call.call_ty
+        ~f:(fun _ ->
+            add call.call_fun;
+            add "(";
+            add @@ String.concat ~sep:"," call.call_args;
+            add ")")
 
     | Prim prim ->
       let bridge = bridge_prim_name prim.prim_name in
-      addln @@ sprintf "var %s %s = %s"
-        prim.prim_rc
-        (Raw_type.to_string prim.prim_ty)
-        bridge
+      with_var prim.prim_rc prim.prim_ty
+        ~f:(fun _ -> add bridge)
 
     | Null -> add "null"
+
     | String (rc, value) ->
-      addln @@ sprintf "var %s string = \"%s\"" rc value
+      with_var rc Raw_type.String
+        ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
 
     | _ -> ()
 
