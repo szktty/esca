@@ -18,18 +18,33 @@ type t =
   | String
   | List of t
   | Option of t
+  | Fun of t list * t
 
-let of_type (ty:Type.t) : t =
+let rec of_type (ty:Type.t) : t =
   match (Type.unwrap ty).desc with
+  | `Meta { contents = var } ->
+    begin match var with
+      | None -> failwith "must not be none"
+      | Some ty -> of_type ty
+    end
   | `App (`Unit, []) -> Void
   | `App (`Bool, []) -> Bool
   | `App (`Int, []) -> Int
   | `App (`Float, []) -> Float32
   | `App (`String, []) -> String
+  | `App (`Fun, args) ->
+    let rec collect args accu =
+      match args with
+      | [] -> failwith "error"
+      | ret :: [] -> Fun (List.rev accu, of_type ret)
+      | arg :: args ->
+        collect args (of_type arg :: accu)
+    in
+    collect args []
   | _ -> Printf.printf "type = %s\n" (Type.to_string ty);
     failwith "not supported"
 
-let to_string = function
+let rec to_string = function
   | Void -> ""
   | Bool -> "bool"
   | Uint -> "uint"
@@ -45,4 +60,23 @@ let to_string = function
   | Float32 -> "float32"
   | Float64 -> "float64"
   | String -> "string"
+  | Fun (args, ret) ->
+    let open Buffer in
+    let buf = create 16 in
+    let rec add_args args =
+      match args with
+      | [] -> ()
+      | arg :: [] ->
+        add_string buf @@ to_string arg;
+        add_args [arg]
+      | arg :: args ->
+        add_string buf @@ to_string arg;
+        add_string buf ", ";
+        add_args args
+    in
+    add_string buf "func (";
+    add_args args;
+    add_string buf " ";
+    add_string buf @@ to_string ret;
+    contents buf
   | _ -> failwith "not impl"
