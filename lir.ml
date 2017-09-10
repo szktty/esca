@@ -176,7 +176,7 @@ module Program = struct
       addln "}"
 
     | Label label ->
-      addln @@ sprintf "%s:" label
+      addln @@ sprintf "\n%s:" label
 
     | Eq_int (reg, v) ->
       addln @@ sprintf "%s = %s == %d" flag reg.id v
