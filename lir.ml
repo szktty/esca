@@ -2,7 +2,21 @@
 
 open Core
 
-type register = string
+module Register = struct
+
+  type id = string
+
+  type t = {
+    id : string;
+    ty : Raw_type.t;
+  }
+
+  let create id ty = { id; ty }
+
+  let ids regs =
+    List.map regs ~f:(fun reg -> reg.id)
+
+end
 
 type label = string
 
@@ -15,15 +29,15 @@ module Op = struct
     | Import of string
     | Struct of (string * Type.t) list
     | Fundef of fundef
-    | Vardef of (register * Type.t)
+    | Vardef of (Register.t * Type.t)
     | Defer of t
 
     | Move of move
-    | Comp of register * register
-    | Comp_int of register * int
+    | Eq of Register.t * Register.t
+    | Eq_int of Register.t * int
     | Branch of branch
     | Jump of label
-    | Return of register list
+    | Return of Register.t list
     | Label of label
 
     | Call of call
@@ -33,13 +47,13 @@ module Op = struct
     | Prim of primitive
     | Null
     | Bool of bool
-    | Int of register * int
+    | Int of Register.t * int
     | Float of float
-    | String of register * string
+    | String of Register.t * string
 
   and move = {
-    mv_from : register;
-    mv_to : register;
+    mv_from : Register.t;
+    mv_to : Register.t;
   }
 
   and branch = {
@@ -56,21 +70,18 @@ module Op = struct
   }
 
   and var = {
-    var_reg : register;
-    var_ty : Raw_type.t;
+    var_reg : Register.t;
   }
 
   and call = {
-    call_rc : register;
-    call_ty : Raw_type.t;
-    call_fun : register;
-    call_args : register list;
+    call_rc : Register.t;
+    call_fun : Register.t;
+    call_args : Register.t list;
   }
 
   and primitive = {
-    prim_rc : register;
+    prim_rc : Register.t;
     prim_name : string;
-    prim_ty : Raw_type.t;
   }
 
 end
@@ -129,11 +140,16 @@ module Program = struct
           add_string buf @@ sprintf ". \"%s/%s\"\n" !Config.runlib_path pkg);
     add_string buf ")\n\n"
 
-  and with_var buf name ty ~f =
+  and decl_var buf name ty =
     let open Buffer in
-    add_string buf @@ sprintf "var %s %s = " name (Raw_type.to_string ty);
+    add_string buf @@ sprintf "var %s %s\n" name (Raw_type.to_string ty);
+    add_string buf @@ sprintf "var _ = %s\n" name
+
+  and with_exp buf name ~f =
+    let open Buffer in
+    add_string buf @@ sprintf "%s = " name;
     f buf;
-    add_string buf @@ sprintf "; var _ = %s\n" name
+    add_string buf @@ sprintf "\n"
 
   and write_op buf (op:Op.t) =
     let open Buffer in
@@ -148,7 +164,7 @@ module Program = struct
     match op with
 
     | Move mv ->
-      addln @@ sprintf "%s = %s" mv.mv_to mv.mv_from
+      addln @@ sprintf "%s = %s" mv.mv_to.id mv.mv_from.id
 
     | Branch br ->
       add @@ sprintf "if ";
@@ -162,34 +178,29 @@ module Program = struct
     | Label label ->
       addln @@ sprintf "%s:" label
 
-    | Comp_int (r, v) ->
-      addln @@ sprintf "%s = %s == %d" flag r v;
-
-      ()
+    | Eq_int (reg, v) ->
+      addln @@ sprintf "%s = %s == %d" flag reg.id v
 
     | Call call ->
       Printf.printf "call\n";
-      with_var buf call.call_rc call.call_ty
+      with_exp buf call.call_rc.id
         ~f:(fun _ ->
-            add call.call_fun;
+            add call.call_fun.id;
             add "(";
-            add @@ String.concat ~sep:"," call.call_args;
+            add @@ String.concat ~sep:"," (Register.ids call.call_args);
             add ")")
 
     | Prim prim ->
       let bridge = bridge_prim_name prim.prim_name in
-      with_var buf prim.prim_rc prim.prim_ty
-        ~f:(fun _ -> add bridge)
+      with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
 
     | Null -> add "null"
 
-    | Int (rc, value) ->
-      with_var buf rc Raw_type.Int
-        ~f:(fun _ -> add @@ sprintf "%d" value)
+    | Int (reg, value) ->
+      with_exp buf reg.id ~f:(fun _ -> add @@ sprintf "%d" value)
 
-    | String (rc, value) ->
-      with_var buf rc Raw_type.String
-        ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
+    | String (reg, value) ->
+      with_exp buf reg.id ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
 
     | _ -> ()
 
@@ -205,9 +216,19 @@ module Program = struct
       add_string buf @@ Raw_type.to_string func.fdef_ret;
     end;
     add_string buf " {\n";
-    (* flag register *)
-    with_var buf flag Raw_type.Bool
-      ~f:(fun buf -> add_string buf "true");
+
+    (* flag Register.id *)
+    decl_var buf flag Raw_type.Bool;
+
+    (* declare variables to avoid "goto" error ("jumps over declaration") *)
+    List.iter func.fdef_vars
+      ~f:(fun var ->
+          add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
+            var.var_reg.id
+            (Raw_type.to_string var.var_reg.ty)
+            var.var_reg.id);
+    add_string buf "\n";
+
     write_ops buf func.fdef_body;
     add_string buf "}\n";
 
@@ -218,50 +239,39 @@ module Context = struct
   type t = {
     src : string;
     mutable rev_ops : Op.t list;
-    mutable reg_n : int;
-    mutable rc_n : int;
-    mutable rc : register;
-    flag : register;
-    vars : Op.var String.Map.t;
-    mutable label_n : int;
-    mutable label : label;
+    mutable regs : Register.t list;
+    mutable rc : Register.t;
+    flag : Register.id;
+    mutable labels : label list;
   }
 
   let create src =
-    (*
-    let out_file, exec_file =
-      match String.rsplit2 src ~on:'.' with
-      | None -> src ^ ext, in_file
-      | Some (base, _) -> base ^ ext, base
-    in
-     *)
+    let r0 = Register.create "r0" Raw_type.Void in
+    let l0 = "L0" in
     { src;
       rev_ops = [];
-      reg_n = 0;
-      rc_n = 0;
-      rc = "rc0";
+      regs = [r0];
+      rc = r0;
       flag = "fr";
-      vars = String.Map.empty;
-      label_n = 0;
-      label = "L0";
+      labels = [l0];
     }
 
-  let new_reg ctx =
-    let reg_n = ctx.reg_n in
-    ctx.reg_n <- reg_n + 1;
-    Printf.sprintf "r%d" reg_n
+  let add_reg ctx reg =
+    ctx.regs <- reg :: ctx.regs
 
-  let new_rc ctx =
-    let rc_n = ctx.rc_n in
-    ctx.rc_n <- rc_n + 1;
-    ctx.rc <- Printf.sprintf "rc%d" rc_n;
-    ctx.rc
+  let new_reg ctx ty =
+    let n = List.length ctx.regs in
+    let id = Printf.sprintf "r%d" n in
+    let reg = Register.create id ty in
+    ctx.regs <- reg :: ctx.regs;
+    ctx.rc <- reg;
+    reg
 
   let new_label ctx =
-    let label_n = ctx.label_n in
-    ctx.label_n <- label_n + 1;
-    ctx.label <- Printf.sprintf "L%d" label_n;
-    ctx.label
+    let n = List.length ctx.labels in
+    let label = Printf.sprintf "L%d" n in
+    ctx.labels <- label :: ctx.labels;
+    label
 
   let add ctx op =
     ctx.rev_ops <- op :: ctx.rev_ops
@@ -272,14 +282,6 @@ module Context = struct
   let move ctx from to_ =
     add ctx @@ Move { mv_from = from; mv_to = to_ }
 
-  let add_var ctx (var:Hir.Closure.var) =
-    let reg = new_reg ctx in
-    let l_var = { Op.var_reg = var.var_id;
-                  var_ty = Raw_type.of_type var.var_ty } in
-    { ctx with vars = String.Map.add ctx.vars
-                   ~key:var.var_id
-                   ~data:l_var }, l_var
-
 end
 
 module Compiler = struct
@@ -287,18 +289,13 @@ module Compiler = struct
   let rec compile_clos ctx (clos:Hir.Closure.t) =
     Printf.printf "LIR: compile closure\n";
     let open Context in
-    let clos_ctx, vars = List.fold_left clos.vars
-        ~init:(ctx, [])
-        ~f:(fun (clos_ctx, vars) var ->
-            let ctx, var = add_var clos_ctx var in
-            ctx, var :: vars)
-    in
-    compile_ops clos_ctx clos.ops;
-    (* TODO *)
+    compile_ops ctx clos.ops;
+    let vars = List.rev_map ctx.regs
+        ~f:(fun reg -> { Op.var_reg = reg }) in
     { Op.fdef_name = "main";
       fdef_params = [];
       fdef_vars = vars;
-      fdef_body = Context.ops clos_ctx;
+      fdef_body = Context.ops ctx;
       fdef_ret = Raw_type.Void }
 
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : unit =
@@ -327,33 +324,31 @@ module Compiler = struct
           call.call_args
           ~init:[]
           ~f:(fun rcs _ ->
-              Printf.printf "call arg: %s\n" ctx.rc;
+              Printf.printf "call arg: %s\n" ctx.rc.id;
               ctx.rc :: rcs)
       in
-      add ctx @@ Call { call_rc = new_rc ctx;
-                        call_ty = Raw_type.of_type call.call_ty;
+      let raw_ty = Raw_type.of_type call.call_ty in
+      add ctx @@ Call { call_rc = new_reg ctx raw_ty;
                         call_fun = f_rc;
                         call_args = List.rev rev_rcs }
 
     | Prim prim ->
       add ctx @@ Prim {
-        prim_rc = new_rc ctx;
+        prim_rc = new_reg ctx (Raw_type.of_type prim.prim_ty);
         prim_name = prim.prim_name;
-        prim_ty = Raw_type.of_type prim.prim_ty;
       }
 
     | Var var ->
       Printf.printf "compile var\n";
       add ctx @@ Var {
-        var_reg = new_rc ctx;
-        var_ty = Raw_type.of_type var.var_ty;
+        var_reg = new_reg ctx (Raw_type.of_type var.var_ty);
       }
 
     | Int value ->
-      add ctx @@ Int (new_rc ctx, value)
+      add ctx @@ Int (new_reg ctx Raw_type.Int, value)
 
     | String value ->
-      add ctx @@ String (new_rc ctx, value)
+      add ctx @@ String (new_reg ctx Raw_type.String, value)
 
     | _ -> ()
 
@@ -380,7 +375,7 @@ module Compiler = struct
     let open Context in
     match ptn with
     | Ptn_nop -> ()
-    | Ptn_int v -> add ctx @@ Comp_int (reg, v)
+    | Ptn_int v -> add ctx @@ Eq_int (reg, v)
     | _ -> failwith "pattern not yet supported"
 
   let run (prog:Hir.Program.t) =

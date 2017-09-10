@@ -113,18 +113,11 @@ end
 
 module Context = struct
 
-  type var = {
-    var_id : string;
-    var_orig : string;
-    (*var_ty : Type.t;*) (* TODO*)
-    mutable var_share : bool;
-  }
-
   type t = {
     file : string;
     package : string option;
     id : int;
-    vars : var String.Map.t;
+    vars : Closure.var list;
     mutable ret : Type.t;
     mutable prog : Program.t option;
   }
@@ -133,7 +126,7 @@ module Context = struct
     { file;
       package = None;
       id = 0;
-      vars = String.Map.empty;
+      vars = [];
       ret = Type.unit;
       prog = None;
     }
@@ -142,17 +135,13 @@ module Context = struct
     let id = ctx.id + 1 in
     { ctx with id = id }, Printf.sprintf "t%d" id
 
-                            (*
-  let add_var ctx name id =
-    let var = { var_id = id; var_share = false } in
-    { ctx with vars = String.Map.add ctx.vars
-                   ~key:name
-                   ~data:var }
-                             *)
+  let new_var ctx ty =
+    let ctx, id = gen_id ctx in
+    let var = { Closure.var_id = id; var_ty = ty } in
+    { ctx with vars = var :: ctx.vars }, id
 
   let to_clos ctx ~parent ~name ~ops =
-    (* TODO: vars *)
-    Closure.create ~parent ~name ~vars:[] ~ops
+    Closure.create ~parent ~name ~vars:ctx.vars ~ops
 
 end
 
@@ -170,6 +159,7 @@ module Compiler = struct
           ~parent:None
           ~name:None
           ~ops:chunk.ch_block in
+      Printf.printf "clos vars = %d\n" (List.length clos.vars);
       ctx.prog <- Some (Program.create
                           ~file:ctx.file
                           ~package:ctx.package
@@ -180,7 +170,7 @@ module Compiler = struct
       { ctx with package = Some name.desc }, Nop
 
     | `Vardef def ->
-      let ctx, id = gen_id ctx in
+      let ctx, id = new_var ctx @@ Ast.type_exn def.vdef_exp in
       let exp_op = compile_node' ctx def.vdef_exp in
       let ctx, ptn_op = compile_ptn ctx def.vdef_ptn in
       let vdef = { vdef_id = id;
@@ -190,10 +180,11 @@ module Compiler = struct
 
     | `Switch sw ->
       Printf.printf "HIR: compile switch\n";
+      let val_ty = Ast.type_exn sw.sw_val in
       let val_op = compile_node' ctx sw.sw_val in
       let cls_ops = List.map sw.sw_cls
           ~f:(fun cls ->
-              let ctx, var_id = gen_id ctx in
+              let ctx, var_id = new_var ctx val_ty in
               let ctx, ptn_op = compile_ptn ctx cls.sw_cls_ptn in
               let grd_op =
                 Option.map cls.sw_cls_guard
@@ -229,7 +220,7 @@ module Compiler = struct
         | Some name ->
           ctx, Prim { prim_name = name; prim_ty = ty }
         | None ->
-          let ctx, var_id = gen_id ctx in
+          let ctx, var_id = new_var ctx ty in
           ctx, Var { var_id; var_ty = ty }
       end
 
@@ -242,13 +233,13 @@ module Compiler = struct
     snd @@ compile_node ctx es
 
   and compile_fold ctx es =
-    let ctx, rev_ops = List.fold_left es
+    let ctx', rev_ops = List.fold_left es
         ~init:(ctx, [])
         ~f:(fun (ctx, accu) e ->
-            let ctx, op = compile_node ctx e in
-            ctx, op :: accu)
+            let ctx', op = compile_node ctx e in
+            ctx', op :: accu)
     in
-    ctx, List.rev rev_ops
+    ctx', List.rev rev_ops
 
   and compile_fold' ctx es =
     snd @@ compile_fold ctx es
@@ -267,10 +258,10 @@ module Compiler = struct
   and compile_ptn' ctx ptn =
     snd @@ compile_ptn ctx ptn
 
-  and compile_block ctx ~parent ~name ~ops =
-    let sub, ops = compile_fold ctx ops in
-    let blk = Context.to_clos sub ~parent ~name ~ops in
-    ctx, blk
+  and compile_block ctx ~parent ~name ~ops : Context.t * Closure.t =
+    let ctx', ops = compile_fold ctx ops in
+    let blk = Context.to_clos ctx' ~parent ~name ~ops in
+    ctx', blk
 
   let run file node =
     let ctx = Context.create file in

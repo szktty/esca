@@ -280,9 +280,12 @@ let print node =
   write Out_channel.stdout node;
   Printf.printf "\n"
 
-let to_type (node:t) : Type.t =
+let type_ (node:t) =
   match node with
-  | `Bool _ -> Type.bool
-  | `Int _ -> Type.int
-  | `String _ -> Type.string
+  | `Bool _ -> Some Type.bool
+  | `Int _ -> Some Type.int
+  | `String _ -> Some Type.string
   | _ -> failwith "not impl"
+
+let type_exn node =
+  Option.value_exn (type_ node)
