@@ -160,6 +160,7 @@ FILES[] =
 	config
 	context
 	env
+	go
 	hir
 	lexer
 	lir

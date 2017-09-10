@@ -4,6 +4,8 @@ open Core
 
 type register = string
 
+type label = string
+
 module Op = struct
 
   type t =
@@ -19,9 +21,10 @@ module Op = struct
     | Move of move
     | Comp of register * register
     | Comp_int of register * int
-    | Branch of bool
-    | End
+    | Branch of branch
+    | Jump of label
     | Return of register list
+    | Label of label
 
     | Call of call
     | Block of t list
@@ -37,6 +40,11 @@ module Op = struct
   and move = {
     mv_from : register;
     mv_to : register;
+  }
+
+  and branch = {
+    br_cond : bool;
+    br_dest : label;
   }
 
   and fundef = {
@@ -121,6 +129,12 @@ module Program = struct
           add_string buf @@ sprintf ". \"%s/%s\"\n" !Config.runlib_path pkg);
     add_string buf ")\n\n"
 
+  and with_var buf name ty ~f =
+    let open Buffer in
+    add_string buf @@ sprintf "var %s %s = " name (Raw_type.to_string ty);
+    f buf;
+    add_string buf @@ sprintf "; var _ = %s\n" name
+
   and write_op buf (op:Op.t) =
     let open Buffer in
     let open Printf in
@@ -130,13 +144,24 @@ module Program = struct
       add s;
       ln 1
     in
-    let with_var name ty ~f =
-      add @@ sprintf "var %s %s = " name (Raw_type.to_string ty);
-      f buf;
-      addln @@ sprintf "; var _ = %s" name
-    in
 
     match op with
+
+    | Move mv ->
+      addln @@ sprintf "%s = %s" mv.mv_to mv.mv_from
+
+    | Branch br ->
+      add @@ sprintf "if ";
+      if not br.br_cond then begin
+        add "!"
+      end;
+      addln @@ sprintf "fr {";
+      addln @@ sprintf "goto %s" br.br_dest;
+      addln "}"
+
+    | Label label ->
+      addln @@ sprintf "%s:" label
+
     | Comp_int (r, v) ->
       addln @@ sprintf "%s = %s == %d" flag r v;
 
@@ -144,7 +169,7 @@ module Program = struct
 
     | Call call ->
       Printf.printf "call\n";
-      with_var call.call_rc call.call_ty
+      with_var buf call.call_rc call.call_ty
         ~f:(fun _ ->
             add call.call_fun;
             add "(";
@@ -153,17 +178,17 @@ module Program = struct
 
     | Prim prim ->
       let bridge = bridge_prim_name prim.prim_name in
-      with_var prim.prim_rc prim.prim_ty
+      with_var buf prim.prim_rc prim.prim_ty
         ~f:(fun _ -> add bridge)
 
     | Null -> add "null"
 
     | Int (rc, value) ->
-      with_var rc Raw_type.Int
+      with_var buf rc Raw_type.Int
         ~f:(fun _ -> add @@ sprintf "%d" value)
 
     | String (rc, value) ->
-      with_var rc Raw_type.String
+      with_var buf rc Raw_type.String
         ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
 
     | _ -> ()
@@ -181,7 +206,8 @@ module Program = struct
     end;
     add_string buf " {\n";
     (* flag register *)
-    add_string buf @@ sprintf "var %s bool = true; var _ = %s\n" flag flag;
+    with_var buf flag Raw_type.Bool
+      ~f:(fun buf -> add_string buf "true");
     write_ops buf func.fdef_body;
     add_string buf "}\n";
 
@@ -197,6 +223,8 @@ module Context = struct
     mutable rc : register;
     flag : register;
     vars : Op.var String.Map.t;
+    mutable label_n : int;
+    mutable label : label;
   }
 
   let create src =
@@ -214,6 +242,8 @@ module Context = struct
       rc = "rc0";
       flag = "fr";
       vars = String.Map.empty;
+      label_n = 0;
+      label = "L0";
     }
 
   let new_reg ctx =
@@ -227,11 +257,20 @@ module Context = struct
     ctx.rc <- Printf.sprintf "rc%d" rc_n;
     ctx.rc
 
+  let new_label ctx =
+    let label_n = ctx.label_n in
+    ctx.label_n <- label_n + 1;
+    ctx.label <- Printf.sprintf "L%d" label_n;
+    ctx.label
+
   let add ctx op =
     ctx.rev_ops <- op :: ctx.rev_ops
 
   let ops ctx =
     List.rev ctx.rev_ops
+
+  let move ctx from to_ =
+    add ctx @@ Move { mv_from = from; mv_to = to_ }
 
   let add_var ctx (var:Hir.Closure.var) =
     let reg = new_reg ctx in
@@ -254,7 +293,7 @@ module Compiler = struct
             let ctx, var = add_var clos_ctx var in
             ctx, var :: vars)
     in
-    compile_iter clos_ctx clos.ops ~f:ignore;
+    compile_ops clos_ctx clos.ops;
     (* TODO *)
     { Op.fdef_name = "main";
       fdef_params = [];
@@ -265,6 +304,7 @@ module Compiler = struct
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : unit =
     let open Context in
     match op with
+
     | Switch sw ->
       Printf.printf "LIR: compile switch\n";
       compile_op ctx sw.sw_val;
@@ -272,6 +312,10 @@ module Compiler = struct
       List.iter sw.sw_clss
         ~f:(fun cls ->
             compile_ptn ctx val_reg cls.sw_cls_ptn;
+            let dest = new_label ctx in
+            add ctx @@ Branch { br_cond = false; br_dest = dest };
+            compile_ops ctx cls.sw_cls_action;
+            add ctx @@ Label dest;
             ());
       ()
 
@@ -313,10 +357,13 @@ module Compiler = struct
 
     | _ -> ()
 
-  and compile_iter (ctx:Context.t)
-      (ops:Hir.Op.t list)
-      ~f =
-    List.iter ops ~f:(fun op -> compile_op ctx op; f op)
+  and compile_iter (ctx:Context.t) (ops:Hir.Op.t list) ~f =
+    List.iter ops ~f:(fun op ->
+        compile_op ctx op;
+        f op)
+
+  and compile_ops (ctx:Context.t) (ops:Hir.Op.t list) =
+    compile_iter ctx ops ~f:ignore
 
   and compile_fold (ctx:Context.t)
       (ops:Hir.Op.t list)
