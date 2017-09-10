@@ -14,10 +14,15 @@ module Op = struct
     | Struct of (string * Type.t) list
     | Fundef of fundef
     | Vardef of (register * Type.t)
-    | Return of register list
     | Defer of t
-    | Get of register
-    | Put of (register * register)
+
+    | Move of move
+    | Comp of register * register
+    | Comp_int of register * int
+    | Branch of bool
+    | End
+    | Return of register list
+
     | Call of call
     | Block of t list
     | Terminal
@@ -25,9 +30,14 @@ module Op = struct
     | Prim of primitive
     | Null
     | Bool of bool
-    | Int of int
+    | Int of register * int
     | Float of float
     | String of register * string
+
+  and move = {
+    mv_from : register;
+    mv_to : register;
+  }
 
   and fundef = {
     fdef_name : string;
@@ -83,6 +93,8 @@ module Program = struct
   let bridge_prim_name name =
     bridge_prim_prefix ^ (Utils.camel_case name)
 
+  let flag = "fr"
+
   let rec write (prog:t) =
     let open Buffer in
     let buf = Buffer.create 16 in
@@ -121,11 +133,15 @@ module Program = struct
     let with_var name ty ~f =
       add @@ sprintf "var %s %s = " name (Raw_type.to_string ty);
       f buf;
-      addln "";
-      addln @@ sprintf "var _ = %s" name
+      addln @@ sprintf "; var _ = %s" name
     in
 
     match op with
+    | Comp_int (r, v) ->
+      addln @@ sprintf "%s = %s == %d" flag r v;
+
+      ()
+
     | Call call ->
       Printf.printf "call\n";
       with_var call.call_rc call.call_ty
@@ -141,6 +157,10 @@ module Program = struct
         ~f:(fun _ -> add bridge)
 
     | Null -> add "null"
+
+    | Int (rc, value) ->
+      with_var rc Raw_type.Int
+        ~f:(fun _ -> add @@ sprintf "%d" value)
 
     | String (rc, value) ->
       with_var rc Raw_type.String
@@ -160,6 +180,8 @@ module Program = struct
       add_string buf @@ Raw_type.to_string func.fdef_ret;
     end;
     add_string buf " {\n";
+    (* flag register *)
+    add_string buf @@ sprintf "var %s bool = true; var _ = %s\n" flag flag;
     write_ops buf func.fdef_body;
     add_string buf "}\n";
 
@@ -173,6 +195,7 @@ module Context = struct
     mutable reg_n : int;
     mutable rc_n : int;
     mutable rc : register;
+    flag : register;
     vars : Op.var String.Map.t;
   }
 
@@ -189,6 +212,7 @@ module Context = struct
       reg_n = 0;
       rc_n = 0;
       rc = "rc0";
+      flag = "fr";
       vars = String.Map.empty;
     }
 
@@ -241,6 +265,16 @@ module Compiler = struct
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : unit =
     let open Context in
     match op with
+    | Switch sw ->
+      Printf.printf "LIR: compile switch\n";
+      compile_op ctx sw.sw_val;
+      let val_reg = ctx.rc in
+      List.iter sw.sw_clss
+        ~f:(fun cls ->
+            compile_ptn ctx val_reg cls.sw_cls_ptn;
+            ());
+      ()
+
     | Call call ->
       Printf.printf "LIR: compile call\n";
       compile_op ctx call.call_fun;
@@ -271,6 +305,9 @@ module Compiler = struct
         var_ty = Raw_type.of_type var.var_ty;
       }
 
+    | Int value ->
+      add ctx @@ Int (new_rc ctx, value)
+
     | String value ->
       add ctx @@ String (new_rc ctx, value)
 
@@ -290,6 +327,14 @@ module Compiler = struct
       ~f:(fun accu op ->
           compile_op ctx op;
           f accu op)
+
+  and compile_ptn ctx reg (ptn:Hir.Op.pattern) =
+    Printf.printf "LIR: compile pattern\n";
+    let open Context in
+    match ptn with
+    | Ptn_nop -> ()
+    | Ptn_int v -> add ctx @@ Comp_int (reg, v)
+    | _ -> failwith "pattern not yet supported"
 
   let run (prog:Hir.Program.t) =
     let ctx = Context.create prog.file in

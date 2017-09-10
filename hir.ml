@@ -10,6 +10,7 @@ module Op = struct
     | Nop
     | Vardef of vardef
     | Assign of assign
+    | Switch of switch
     | Block of t list
     | Call of call
     | Var of var
@@ -23,7 +24,7 @@ module Op = struct
 
   and vardef = {
     vdef_id : id;
-    vdef_ptn : t;
+    vdef_ptn : pattern;
     vdef_exp : t;
   }
 
@@ -31,6 +32,28 @@ module Op = struct
     asn_var : t;
     asn_exp : t;
   }
+
+  and switch = {
+    sw_val : t;
+    sw_clss : switch_clause list;
+  }
+
+  and switch_clause = {
+    sw_cls_var : id;
+    sw_cls_ptn : pattern;
+    sw_cls_guard : t option;
+    sw_cls_action : t list;
+  }
+
+  and pattern =
+    | Ptn_nop
+    | Ptn_void
+    | Ptn_bool of bool
+    | Ptn_string of string
+    | Ptn_int of int
+    | Ptn_float of float
+    | Ptn_tuple of pattern list
+    | Ptn_var of id
 
   and call = {
     call_fun : t;
@@ -135,7 +158,7 @@ end
 
 module Compiler = struct
 
-  let rec compile_node (ctx:Context.t) (node:Ast.t) =
+  let rec compile_node (ctx:Context.t) (node:Ast.t) : Context.t * Op.t =
     let open Located in
     let open Op in
     let open Context in
@@ -164,6 +187,29 @@ module Compiler = struct
                    vdef_ptn = ptn_op;
                    vdef_exp = exp_op } in
       ctx, Vardef vdef
+
+    | `Switch sw ->
+      Printf.printf "HIR: compile switch\n";
+      let val_op = compile_node' ctx sw.sw_val in
+      let cls_ops = List.map sw.sw_cls
+          ~f:(fun cls ->
+              let ctx, var_id = gen_id ctx in
+              let ctx, ptn_op = compile_ptn ctx cls.sw_cls_ptn in
+              let grd_op =
+                Option.map cls.sw_cls_guard
+                  ~f:(fun grd -> compile_node' ctx grd) in
+              let act_ops = compile_fold' ctx cls.sw_cls_action in
+              {
+                sw_cls_var = var_id;
+                sw_cls_ptn = ptn_op;
+                sw_cls_guard = grd_op;
+                sw_cls_action = act_ops;
+              });
+      in
+      ctx, Switch {
+        sw_val = val_op;
+        sw_clss = cls_ops;
+      }
 
     | `Funcall call -> 
       Printf.printf "HIR: compile funcall\n";
@@ -204,13 +250,19 @@ module Compiler = struct
     in
     ctx, List.rev rev_ops
 
+  and compile_fold' ctx es =
+    snd @@ compile_fold ctx es
+
   and compile_iter ctx es =
     List.iter es ~f:(fun e -> ignore @@ compile_node ctx e)
 
-  and compile_ptn ctx (ptn:Ast.pattern) =
+  and compile_ptn ctx (ptn:Ast.pattern) : Context.t * Op.pattern =
     let open Op in
-    match ptn with
-    | _ -> ctx, Nop
+    match ptn.ptn_cls with
+    | `Nop _ -> ctx, Ptn_nop
+    | `Unit _ -> ctx, Ptn_void
+    | `Int v -> ctx, Ptn_int v.desc
+    | _ -> ctx, Ptn_nop
 
   and compile_ptn' ctx ptn =
     snd @@ compile_ptn ctx ptn
