@@ -52,6 +52,7 @@ module Op = struct
     | Ptn_string of string
     | Ptn_int of int
     | Ptn_float of float
+    | Ptn_list of pattern list
     | Ptn_tuple of pattern list
     | Ptn_var of id
 
@@ -190,8 +191,7 @@ module Compiler = struct
                 Option.map cls.sw_cls_guard
                   ~f:(fun grd -> compile_node' ctx grd) in
               let act_ops = compile_fold' ctx cls.sw_cls_action in
-              {
-                sw_cls_var = var_id;
+              { sw_cls_var = var_id;
                 sw_cls_ptn = ptn_op;
                 sw_cls_guard = grd_op;
                 sw_cls_action = act_ops;
@@ -249,10 +249,26 @@ module Compiler = struct
 
   and compile_ptn ctx (ptn:Ast.pattern) : Context.t * Op.pattern =
     let open Op in
+
+    let fold ctx ptns ~f =
+      let ctx', rev_ptns =
+        List.fold_left ptns
+          ~init:(ctx, [])
+          ~f:(fun (ctx, accu) ptn ->
+              let ctx', ptn' = compile_ptn ctx ptn in
+              ctx, ptn' :: accu) in
+      ctx', f @@ List.rev rev_ptns
+    in
+
     match ptn.ptn_cls with
     | `Nop _ -> ctx, Ptn_nop
     | `Unit _ -> ctx, Ptn_void
+    | `Bool v -> ctx, Ptn_bool v.desc
     | `Int v -> ctx, Ptn_int v.desc
+    | `String v -> ctx, Ptn_string v.desc
+    | `Float v -> ctx, Ptn_float v.desc
+    | `List ptns -> fold ctx ptns ~f:(fun ptns' -> Ptn_list ptns')
+    | `Tuple ptns -> fold ctx ptns ~f:(fun ptns' -> Ptn_tuple ptns')
     | _ -> ctx, Ptn_nop
 
   and compile_ptn' ctx ptn =

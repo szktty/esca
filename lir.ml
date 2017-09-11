@@ -34,7 +34,11 @@ module Op = struct
 
     | Move of move
     | Eq of Register.t * Register.t
+    | Eq_void of Register.t
+    | Eq_bool of Register.t * bool
     | Eq_int of Register.t * int
+    | Eq_float of Register.t * float
+    | Eq_string of Register.t * string
     | Branch of branch
     | Jump of label
     | Return of Register.t list
@@ -178,8 +182,20 @@ module Program = struct
     | Label label ->
       addln @@ sprintf "\n%s:" label
 
+    | Eq_void reg ->
+      addln @@ sprintf "%s = %s == Void{}" flag reg.id
+
+    | Eq_bool (reg, v) ->
+      addln @@ sprintf "%s = %s == %s" flag reg.id (Go.Repr.of_bool v)
+
     | Eq_int (reg, v) ->
       addln @@ sprintf "%s = %s == %d" flag reg.id v
+
+    | Eq_float (reg, v) ->
+      addln @@ sprintf "%s = %s == %f" flag reg.id v
+
+    | Eq_string (reg, v) ->
+      addln @@ sprintf "%s = %s == %s" flag reg.id (Go.Repr.of_string v)
 
     | Call call ->
       Printf.printf "call\n";
@@ -375,7 +391,11 @@ module Compiler = struct
     let open Context in
     match ptn with
     | Ptn_nop -> ()
+    | Ptn_void -> add ctx @@ Eq_void reg
+    | Ptn_bool v -> add ctx @@ Eq_bool (reg, v)
     | Ptn_int v -> add ctx @@ Eq_int (reg, v)
+    | Ptn_float v -> add ctx @@ Eq_float (reg, v)
+    | Ptn_string v -> add ctx @@ Eq_string (reg, v)
     | _ -> failwith "pattern not yet supported"
 
   let run (prog:Hir.Program.t) =
