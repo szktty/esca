@@ -1,5 +1,7 @@
 # Esca
 
+Esca is an experimental strongly-typed language which compiles to Go.
+
 ## Installing Esca
 
 ```
