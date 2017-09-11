@@ -128,7 +128,7 @@ module Program = struct
     Printf.printf "golang = %s\n" (contents buf);
     Printf.printf "out = %s\n" prog.out;
     Out_channel.write_all prog.out ~data:code;
-    ()
+    prog.out
 
   and write_pkg buf prog =
     let open Buffer in
@@ -411,17 +411,6 @@ module Compiler = struct
         ~top
         ~subs:[]
     in
-    Program.write prog;
-
-    (* compile block *)
-(*
-    compile_op ctx op;
-    let buf = Buffer.create 1000 in
-    write_ops buf (ops ctx);
-    Printf.printf "write = %s\n" (Buffer.contents buf);
-    Out_channel.with_file ctx.out_file
-      ~f:(fun chan -> Out_channel.output_string chan (Buffer.contents buf));
-     *)
-    ()
+    Program.write prog
 
 end

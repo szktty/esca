@@ -65,8 +65,16 @@ let command =
              let node = parse_file file in
              ignore @@ Typing.run node;
 
-             Hir.Compiler.run file node
-             |> Lir.Compiler.run;
+             let out = Hir.Compiler.run file node
+                       |> Lir.Compiler.run in
+             (* TODO: error handling *)
+             if (Sys.command @@ sprintf "goimports -w %s" out) = 0 then begin
+               if (Sys.command @@ sprintf "go build -o %s %s"
+                     (Filename.chop_extension out)
+                     out) = 0 then begin
+
+               end
+             end
 (*
              begin try Compiler.compile node ~file with
                | Compiler.Error e ->
