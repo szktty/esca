@@ -2,7 +2,7 @@ package kernel
 
 import (
 	"fmt"
-	"github.com/szktty/esca/go/runtime/base"
+	"github.com/szktty/esca/runtime/base"
 )
 
 func EscaPrimPrint(arg string) types.Void {
