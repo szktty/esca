@@ -7,7 +7,7 @@ module Register = struct
   type id = string
 
   type t = {
-    id : string;
+    id : id;
     ty : Raw_type.t;
   }
 
@@ -55,6 +55,13 @@ module Op = struct
     | Float of float
     | String of Register.t * string
 
+  and context = {
+    ctx_src : string;
+    ctx_ops : t list;
+    ctx_regs : Register.t list;
+    ctx_flag : Register.id;
+  }
+
   and move = {
     mv_from : Register.t;
     mv_to : Register.t;
@@ -66,7 +73,8 @@ module Op = struct
   }
 
   and fundef = {
-    fdef_name : string;
+    fdef_ctx : context;
+    fdef_reg : Register.t;
     fdef_params : var list;
     fdef_vars : var list;
     fdef_body : t list;
@@ -224,10 +232,11 @@ module Program = struct
 
   and write_fun buf func =
     let open Buffer in
+    let id = func.fdef_reg.id in
     add_string buf "func ";
-    add_string buf func.fdef_name;
+    add_string buf id;
     add_string buf "() ";
-    if func.fdef_name <> "main" then begin
+    if id <> "main" then begin
       add_string buf @@ Raw_type.to_string func.fdef_ret;
     end;
     add_string buf " {\n";
@@ -245,7 +254,7 @@ module Program = struct
     add_string buf "\n";
 
     write_ops buf func.fdef_body;
-    add_string buf "}\n";
+    add_string buf "}\n\n";
 
 end
 
@@ -253,18 +262,18 @@ module Context = struct
 
   type t = {
     src : string;
-    mutable rev_ops : Op.t list;
-    mutable regs : Register.t list;
-    mutable rc : Register.t;
+    ops : Op.t list;
+    regs : Register.t list;
+    rc : Register.t;
     flag : Register.id;
-    mutable labels : label list;
+    labels : label list;
   }
 
   let create src =
     let r0 = Register.create "r0" Raw_type.Void in
     let l0 = "L0" in
     { src;
-      rev_ops = [];
+      ops = [];
       regs = [r0];
       rc = r0;
       flag = "fr";
@@ -272,136 +281,153 @@ module Context = struct
     }
 
   let add_reg ctx reg =
-    ctx.regs <- reg :: ctx.regs
+    { ctx with regs = reg :: ctx.regs }
 
   let new_reg ctx ty =
     let n = List.length ctx.regs in
     let id = Printf.sprintf "r%d" n in
     let reg = Register.create id ty in
-    ctx.regs <- reg :: ctx.regs;
-    ctx.rc <- reg;
-    reg
+    let ctx = add_reg ctx reg in
+    { ctx with rc = reg }, reg
 
   let new_label ctx =
     let n = List.length ctx.labels in
     let label = Printf.sprintf "L%d" n in
-    ctx.labels <- label :: ctx.labels;
-    label
+    { ctx with labels = label :: ctx.labels }, label
 
-  let add ctx op =
-    ctx.rev_ops <- op :: ctx.rev_ops
+  let add_op ctx op =
+    { ctx with ops = op :: ctx.ops }
 
-  let ops ctx =
-    List.rev ctx.rev_ops
+  let add_op_with_reg ctx ty ~f =
+    let ctx, reg = new_reg ctx ty in
+    add_op ctx @@ f reg
 
   let move ctx from to_ =
-    add ctx @@ Move { mv_from = from; mv_to = to_ }
+    add_op ctx @@ Move { mv_from = from; mv_to = to_ }
+
+  let finish ctx =
+    { ctx with ops = List.rev ctx.ops }
+
+  let to_clos_ctx ctx : Op.context =
+    { ctx_src = ctx.src;
+      ctx_ops = ctx.ops;
+      ctx_regs = ctx.regs;
+      ctx_flag = ctx.flag }
+
 
 end
 
 module Compiler = struct
 
-  let rec compile_clos ctx (clos:Hir.Closure.t) =
+  let rec compile_clos ctx (clos:Hir.Closure.t) : Context.t * Op.fundef =
     Printf.printf "LIR: compile closure '%s'\n" clos.var.id;
     let open Context in
-    compile_block ctx clos.block;
-    let vars = List.rev_map ctx.regs
+    let clos_ctx = compile_block ctx clos.block in
+    Printf.printf "ops: %d\n" (List.length clos_ctx.ops);
+    let vars = List.rev_map clos_ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
-    let ops = Context.ops ctx in
-    ctx.rev_ops <- [];
-    { Op.fdef_name = clos.var.id;
-      fdef_params = [];
-      fdef_vars = vars;
-      fdef_body = ops;
-      fdef_ret = Raw_type.Void }
+    let clos_ctx = finish clos_ctx in
+    let ctx, reg = new_reg clos_ctx (Raw_type.of_type clos.var.ty) in
+    let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
+                 fdef_reg = reg;
+                 fdef_params = [];
+                 fdef_vars = vars;
+                 fdef_body = clos_ctx.ops;
+                 fdef_ret = Raw_type.Void } in
+    ctx, fdef
 
-  and compile_op (ctx:Context.t) (op:Hir.Op.t) : unit =
+  and compile_op (ctx:Context.t) (op:Hir.Op.t) : Context.t =
     let open Context in
     match op with
 
     | Switch sw ->
       Printf.printf "LIR: compile switch\n";
-      compile_op ctx sw.sw_val;
+      let ctx = compile_op ctx sw.sw_val in
       let val_reg = ctx.rc in
-      List.iter sw.sw_clss
-        ~f:(fun cls ->
-            compile_ptn ctx val_reg cls.sw_cls_ptn;
-            let dest = new_label ctx in
-            add ctx @@ Branch { br_cond = false; br_dest = dest };
-            compile_block ctx cls.sw_cls_action;
-            add ctx @@ Label dest;
-            ());
-      ()
+      List.fold_left sw.sw_clss
+        ~init:ctx
+        ~f:(fun ctx cls ->
+            let ctx = compile_ptn ctx val_reg cls.sw_cls_ptn in
+            let ctx, dest = new_label ctx in
+            let ctx = add_op ctx @@
+              Branch { br_cond = false; br_dest = dest } in
+            let ctx = compile_block ctx cls.sw_cls_action in
+            add_op ctx @@ Label dest)
 
     | Call call ->
       Printf.printf "LIR: compile call\n";
-      compile_op ctx call.call_fun;
-      let f_rc = ctx.rc in
-      let rev_rcs = compile_fold ctx
-          call.call_args
-          ~init:[]
-          ~f:(fun rcs _ ->
-              Printf.printf "call arg: %s\n" ctx.rc.id;
-              ctx.rc :: rcs)
-      in
-      let raw_ty = Raw_type.of_type call.call_ty in
-      add ctx @@ Call { call_rc = new_reg ctx raw_ty;
-                        call_fun = f_rc;
-                        call_args = List.rev rev_rcs }
+      let ctx = compile_op ctx call.call_fun in
+      let fun_reg = ctx.rc in
+      let ctx, arg_regs = compile_exps ctx call.call_args in
+      add_op_with_reg ctx fun_reg.ty
+        ~f:(fun reg -> Call { call_rc = reg;
+                              call_fun = fun_reg;
+                              call_args = arg_regs })
 
     | Prim prim ->
-      add ctx @@ Prim {
-        prim_rc = new_reg ctx (Raw_type.of_type prim.prim_ty);
+      let ctx, reg = new_reg ctx (Raw_type.of_type prim.prim_ty) in
+      add_op ctx @@ Prim {
+        prim_rc = reg;
         prim_name = prim.prim_name;
       }
 
     | Var var ->
       Printf.printf "compile var\n";
-      add ctx @@ Var {
-        var_reg = new_reg ctx (Raw_type.of_type var.ty);
-      }
+      add_op_with_reg ctx (Raw_type.of_type var.ty)
+        ~f:(fun reg -> Var { var_reg = reg })
 
     | Int value ->
-      add ctx @@ Int (new_reg ctx Raw_type.Int, value)
+      add_op_with_reg ctx Raw_type.Int
+        ~f:(fun reg -> Int (reg, value))
 
     | String value ->
-      add ctx @@ String (new_reg ctx Raw_type.String, value)
+      Printf.printf "LIR: compile string\n";
+      add_op_with_reg ctx Raw_type.String
+        ~f:(fun reg -> String (reg, value))
 
-    | _ -> ()
-
-  and compile_iter (ctx:Context.t) (ops:Hir.Op.t list) ~f =
-    List.iter ops ~f:(fun op ->
-        compile_op ctx op;
-        f op)
+    | _ -> ctx
 
   and compile_block (ctx:Context.t) (ops:Hir.Op.t list) =
-    compile_iter ctx ops ~f:ignore
-
-  and compile_fold (ctx:Context.t)
-      (ops:Hir.Op.t list)
-      ~(init:'a)
-      ~(f:('a -> Hir.Op.t -> 'a)) : 'a =
+    Printf.printf "# begin compile_block ops: %d, %d\n"
+      (List.length ops)
+      (List.length ctx.ops);
     List.fold_left ops
-      ~init
-      ~f:(fun accu op ->
-          compile_op ctx op;
-          f accu op)
+      ~init:ctx
+      ~f:(fun ctx op ->
+          Printf.printf "# compile_block ops: %d\n" (List.length ctx.ops);
+          let ctx = compile_op ctx op in
+          Printf.printf "# end compile_block ops: %d\n" (List.length ctx.ops);
+          ctx 
+        )
+
+  and compile_exps (ctx:Context.t) (ops:Hir.Op.t list) =
+    let ctx, regs =
+      List.fold_left ops
+        ~init:(ctx, [])
+        ~f:(fun (ctx, regs) op ->
+            let ctx = compile_op ctx op in
+            ctx, ctx.rc :: regs)
+    in
+    ctx, List.rev regs
 
   and compile_ptn ctx reg (ptn:Hir.Op.pattern) =
     Printf.printf "LIR: compile pattern\n";
     let open Context in
     match ptn with
-    | Ptn_nop -> ()
-    | Ptn_void -> add ctx @@ Eq_void reg
-    | Ptn_bool v -> add ctx @@ Eq_bool (reg, v)
-    | Ptn_int v -> add ctx @@ Eq_int (reg, v)
-    | Ptn_float v -> add ctx @@ Eq_float (reg, v)
-    | Ptn_string v -> add ctx @@ Eq_string (reg, v)
+    | Ptn_nop -> ctx
+    | Ptn_void -> add_op ctx @@ Eq_void reg
+    | Ptn_bool v -> add_op ctx @@ Eq_bool (reg, v)
+    | Ptn_int v -> add_op ctx @@ Eq_int (reg, v)
+    | Ptn_float v -> add_op ctx @@ Eq_float (reg, v)
+    | Ptn_string v -> add_op ctx @@ Eq_string (reg, v)
     | _ -> failwith "pattern not yet supported"
 
   let run (prog:Hir.Program.t) =
     let ctx = Context.create prog.file in
-    let funs = List.map prog.funs ~f:(fun clos -> compile_clos ctx clos) in
+    let funs = List.map prog.funs
+        ~f:(fun clos ->
+            let _, clos' = compile_clos ctx clos in
+            clos') in
     let prog = Program.create
         ~src:prog.file
         ~out:((Filename.chop_extension prog.file) ^".go")
