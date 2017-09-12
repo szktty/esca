@@ -356,7 +356,7 @@ module Compiler = struct
     | Var var ->
       Printf.printf "compile var\n";
       add ctx @@ Var {
-        var_reg = new_reg ctx (Raw_type.of_type var.var_ty);
+        var_reg = new_reg ctx (Raw_type.of_type var.ty);
       }
 
     | Int value ->

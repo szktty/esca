@@ -96,6 +96,12 @@ let rec unwrap (ty:t) =
   | `Poly (_, ty) -> unwrap ty
   | _ -> ty
 
+let rec fun_params (ty:t) =
+  match (unwrap ty).desc with
+  | `App (`Fun, args) -> List.rev args |> List.tl_exn |> List.rev
+  | `App (`Prim { prim_type }, []) -> fun_params prim_type
+  | _ -> failwith "not function"
+
 let rec fun_return (ty:t) =
   match ty.desc with
   | `Meta { contents = Some ty }

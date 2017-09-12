@@ -262,7 +262,6 @@ fundef:
         fdef_name = $2;
         fdef_params = $3;
         fdef_block = [$5];
-        fdef_param_types = None;
         fdef_type = None;
     }
   }
@@ -272,7 +271,6 @@ fundef:
         fdef_name = $2;
         fdef_params = $3;
         fdef_block = $5;
-        fdef_param_types = None;
         fdef_type = None;
     }
   }

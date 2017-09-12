@@ -271,6 +271,7 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
         in
         let ret = Type.create_metavar loc in
         let fun_ty = Type.fun_ (Some loc) params ret in
+        fdef.fdef_type <- Some fun_ty;
         (* for recursive call *)
         let env = Env.add env fdef.fdef_name.desc fun_ty in
         let fenv = List.fold2_exn fdef.fdef_params params ~init:env

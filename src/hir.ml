@@ -2,9 +2,18 @@
 
 open Core.Std
 
-module Op = struct
+type id = string
 
-  type id = string
+module Var = struct
+
+  type t = {
+    id : id;
+    ty : Type.t;
+  }
+
+end
+
+module Op = struct
 
   type t =
     | Nop
@@ -14,7 +23,7 @@ module Op = struct
     | Switch of switch
     | Block of t list
     | Call of call
-    | Var of var
+    | Var of Var.t
     | Prim of primitive
     | Null
     | Bool of bool
@@ -24,14 +33,13 @@ module Op = struct
     | List of t list
 
   and fundef = {
-    fdef_id : id;
-    fdef_params : id list; (* TODO: var list *)
+    fdef_var : Var.t;
+    fdef_params : Var.t list;
     fdef_block : t list;
-    fdef_ty : Type.t;
   }
 
   and vardef = {
-    vdef_id : id;
+    vdef_var : Var.t;
     vdef_ptn : pattern;
     vdef_exp : t;
   }
@@ -47,7 +55,7 @@ module Op = struct
   }
 
   and switch_clause = {
-    sw_cls_var : id;
+    sw_cls_var : Var.t;
     sw_cls_ptn : pattern;
     sw_cls_guard : t option;
     sw_cls_action : t list;
@@ -75,11 +83,6 @@ module Op = struct
     blk_list : t list;
   }
 
-  and var = {
-    var_id : id;
-    var_ty : Type.t;
-  }
-
   and primitive = {
     prim_name : string;
     prim_ty : Type.t;
@@ -89,27 +92,22 @@ end
 
 module Closure = struct
 
-  type var = {
-    var_id : string;
-    var_ty : Type.t;
-  }
-
   type t = {
     parent : t option;
-    id : string;
-    vars : var list;
+    var : Var.t;
+    params : Var.t list;
     block : Op.t list;
     (* ret : Type.t; *)
   }
 
-  let create ~parent ~id ~vars ~block =
-    { parent; id; vars; block }
+  let create ~parent ~var ~params ~block =
+    { parent; var; params; block }
 
   let of_fundef (def:Op.fundef) =
     create
       ~parent:None
-      ~id:def.fdef_id
-      ~vars:[]
+      ~var:def.fdef_var
+      ~params:[]
       ~block: def.fdef_block
 
 end
@@ -134,7 +132,7 @@ module Context = struct
     package : string option;
     stack : t list;
     id : int;
-    vars : Closure.var list;
+    vars : Var.t list;
     mutable ret : Type.t;
     mutable prog : Program.t option;
   }
@@ -158,8 +156,11 @@ module Context = struct
 
   let new_var ctx ty =
     let ctx, id = gen_id ctx in
-    let var = { Closure.var_id = id; var_ty = ty } in
-    { ctx with vars = var :: ctx.vars }, id
+    let var = { Var.id = id; ty = ty } in
+    { ctx with vars = var :: ctx.vars }, var
+
+  (* TODO: type *)
+  let main_fun = { Var.id = "main"; ty = Type.unit }
 
 end
 
@@ -197,40 +198,32 @@ module Compiler = struct
       { ctx with package = Some name.desc }, Nop
 
     | `Fundef def ->
-        (*
-  fdef_name : text;
-  fdef_params : text list;
-  fdef_block : t list;
-  mutable fdef_param_types : Type.t list option;
-  mutable fdef_type : Type.t option;
-         *)
-      (* TODO: fun type *)
-      let ctx, id =
+      let ctx, var =
         match def.fdef_name.desc with
-        | "main" -> ctx, "main"
-        | _ -> new_var ctx Type.unit
+        | "main" -> ctx, main_fun
+        | _ -> new_var ctx @@ Option.value_exn def.fdef_type
       in 
-      let ctx, rev_params = List.fold_left def.fdef_params
+      let params = Type.fun_params @@ Option.value_exn def.fdef_type in
+      let ctx, rev_params =
+        List.fold_left params
           ~init:(ctx, [])
-          (* TODO: param types *)
-          ~f:(fun (ctx, ids) param ->
-              let ctx, id = new_var ctx Type.unit in
-              ctx, id :: ids)
+          ~f:(fun (ctx, vars) ty ->
+              let ctx, var = new_var ctx ty in
+              ctx, var :: vars)
       in
       let params = List.rev rev_params in
       let ctx, block = compile_fold ctx def.fdef_block in
       ctx, Fundef {
-        fdef_id = id;
+        fdef_var = var;
         fdef_params = params;
         fdef_block = block;
-        fdef_ty = Type.unit;
       }
 
     | `Vardef def ->
-      let ctx, id = new_var ctx @@ Ast.type_exn def.vdef_exp in
+      let ctx, var = new_var ctx @@ Ast.type_exn def.vdef_exp in
       let exp_op = compile_node' ctx def.vdef_exp in
       let ctx, ptn_op = compile_ptn ctx def.vdef_ptn in
-      let vdef = { vdef_id = id;
+      let vdef = { vdef_var = var;
                    vdef_ptn = ptn_op;
                    vdef_exp = exp_op } in
       ctx, Vardef vdef
@@ -241,13 +234,13 @@ module Compiler = struct
       let val_op = compile_node' ctx sw.sw_val in
       let cls_ops = List.map sw.sw_cls
           ~f:(fun cls ->
-              let ctx, var_id = new_var ctx val_ty in
+              let ctx, var = new_var ctx val_ty in
               let ctx, ptn_op = compile_ptn ctx cls.sw_cls_ptn in
               let grd_op =
                 Option.map cls.sw_cls_guard
                   ~f:(fun grd -> compile_node' ctx grd) in
               let act_ops = compile_fold' ctx cls.sw_cls_action in
-              { sw_cls_var = var_id;
+              { sw_cls_var = var;
                 sw_cls_ptn = ptn_op;
                 sw_cls_guard = grd_op;
                 sw_cls_action = act_ops;
@@ -276,8 +269,8 @@ module Compiler = struct
         | Some name ->
           ctx, Prim { prim_name = name; prim_ty = ty }
         | None ->
-          let ctx, var_id = new_var ctx ty in
-          ctx, Var { var_id; var_ty = ty }
+          let ctx, var = new_var ctx ty in
+          ctx, Var var
       end
 
     | `Bool value -> ctx, Bool value.desc

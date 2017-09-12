@@ -105,7 +105,6 @@ and fundef = {
   fdef_name : text;
   fdef_params : text list;
   fdef_block : t list;
-  mutable fdef_param_types : Type.t list option;
   mutable fdef_type : Type.t option;
 }
 
