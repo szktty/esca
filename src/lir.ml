@@ -307,10 +307,12 @@ module Compiler = struct
     compile_block ctx clos.block;
     let vars = List.rev_map ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
+    let ops = Context.ops ctx in
+    ctx.rev_ops <- [];
     { Op.fdef_name = clos.var.id;
       fdef_params = [];
       fdef_vars = vars;
-      fdef_body = Context.ops ctx;
+      fdef_body = ops;
       fdef_ret = Raw_type.Void }
 
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : unit =
