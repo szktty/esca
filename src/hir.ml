@@ -154,6 +154,9 @@ module Context = struct
     let id = ctx.id + 1 in
     { ctx with id = id }, Printf.sprintf "t%d" id
 
+  let add_var ctx var =
+    { ctx with vars = var :: ctx.vars }
+
   let new_var ctx ty =
     let ctx, id = gen_id ctx in
     let var = { Var.id = id; ty = ty } in
@@ -198,23 +201,27 @@ module Compiler = struct
       { ctx with package = Some name.desc }, Nop
 
     | `Fundef def ->
-      let ctx, var =
+      Printf.printf "HIR: compile fundef\n";
+      Ast.print node;
+      let fun_ctx = ctx in
+      let fun_ctx, fun_var =
         match def.fdef_name.desc with
-        | "main" -> ctx, main_fun
-        | _ -> new_var ctx @@ Option.value_exn def.fdef_type
+        | "main" -> fun_ctx, main_fun
+        | _ -> new_var fun_ctx @@ Option.value_exn def.fdef_type
       in 
       let params = Type.fun_params @@ Option.value_exn def.fdef_type in
-      let ctx, rev_params =
+      let fun_ctx, rev_params =
         List.fold_left params
-          ~init:(ctx, [])
+          ~init:(fun_ctx, [])
           ~f:(fun (ctx, vars) ty ->
               let ctx, var = new_var ctx ty in
               ctx, var :: vars)
       in
       let params = List.rev rev_params in
-      let ctx, block = compile_fold ctx def.fdef_block in
-      ctx, Fundef {
-        fdef_var = var;
+      let _, block = compile_fold fun_ctx def.fdef_block in
+      let ctx' = add_var ctx fun_var in
+      ctx', Fundef {
+        fdef_var = fun_var;
         fdef_params = params;
         fdef_block = block;
       }

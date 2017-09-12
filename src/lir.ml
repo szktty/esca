@@ -302,12 +302,12 @@ end
 module Compiler = struct
 
   let rec compile_clos ctx (clos:Hir.Closure.t) =
-    Printf.printf "LIR: compile closure\n";
+    Printf.printf "LIR: compile closure '%s'\n" clos.var.id;
     let open Context in
     compile_block ctx clos.block;
     let vars = List.rev_map ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
-    { Op.fdef_name = "main";
+    { Op.fdef_name = clos.var.id;
       fdef_params = [];
       fdef_vars = vars;
       fdef_body = Context.ops ctx;
