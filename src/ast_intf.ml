@@ -81,7 +81,7 @@ type t = [
 
 and chunk = {
   ch_attrs : t list;
-  ch_block : t list;
+  ch_stats : t list;
 }
 
 and exp = {

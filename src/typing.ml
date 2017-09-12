@@ -198,7 +198,7 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
       | `Nop _ -> (env, desc_unit)
 
       | `Chunk chunk -> 
-        let env = List.fold_left chunk.ch_block
+        let env = List.fold_left chunk.ch_stats
             ~init:env
             ~f:(fun env e -> fst @@ infer env e)
         in

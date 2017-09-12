@@ -121,8 +121,8 @@ prog:
   | chunk EOF { $1 }
 
 chunk:
-  | block { `Chunk { ch_attrs = []; ch_block = $1 } }
-  | attr_list block { `Chunk { ch_attrs = $1; ch_block = $1 } }
+  | top_stat_list { `Chunk { ch_attrs = []; ch_stats = $1 } }
+  | attr_list top_stat_list { `Chunk { ch_attrs = $1; ch_stats = $1 } }
 
 attr_list:
   | rev_attr_list { Core.Std.List.rev $1 }
@@ -135,6 +135,23 @@ rev_attr_list:
 
 attr:
   | PACKAGE IDENT { `Package $2 }
+
+top_stat_list:
+  | rev_top_stat_list { Core.Std.List.rev $1 }
+  | rev_top_stat_list SEMI { Core.Std.List.rev $1 }
+
+rev_top_stat_list:
+  | top_stat { [$1] }
+  | rev_top_stat_list top_stat { $2 :: $1 }
+  | rev_top_stat_list SEMI top_stat { $3 :: $1 }
+
+top_stat:
+  | directive { $1 }
+  | module_def { $1 }
+  | struct_def { $1 }
+  | enum_def { $1 }
+  | vardef { $1 }
+  | fundef { $1 }
 
 block:
   | (* empty *) { [] }
@@ -154,10 +171,6 @@ rev_stat_list:
   | rev_stat_list SEMI stat { $3 :: $1 }
 
 stat:
-  | directive { $1 }
-  | module_def { $1 }
-  | struct_def { $1 }
-  | enum_def { $1 }
   | vardef { $1 }
   | fundef { $1 }
   | var EQ exp (* TODO: exp_list *)

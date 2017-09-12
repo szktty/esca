@@ -8,6 +8,7 @@ module Op = struct
 
   type t =
     | Nop
+    | Fundef of fundef
     | Vardef of vardef
     | Assign of assign
     | Switch of switch
@@ -21,6 +22,13 @@ module Op = struct
     | Int of int
     | Float of float
     | List of t list
+
+  and fundef = {
+    fdef_id : id;
+    fdef_params : id list; (* TODO: var list *)
+    fdef_block : t list;
+    fdef_ty : Type.t;
+  }
 
   and vardef = {
     vdef_id : id;
@@ -88,14 +96,21 @@ module Closure = struct
 
   type t = {
     parent : t option;
-    name : string option;
+    id : string;
     vars : var list;
-    ops : Op.t list;
+    block : Op.t list;
     (* ret : Type.t; *)
   }
 
-  let create ~parent ~name ~vars ~ops =
-    { parent; name; vars; ops }
+  let create ~parent ~id ~vars ~block =
+    { parent; id; vars; block }
+
+  let of_fundef (def:Op.fundef) =
+    create
+      ~parent:None
+      ~id:def.fdef_id
+      ~vars:[]
+      ~block: def.fdef_block
 
 end
 
@@ -104,11 +119,11 @@ module Program = struct
   type t = {
     file : string;
     package : string option;
-    clos : Closure.t;
+    funs : Closure.t list;
   }
 
-  let create ~file ~package ~clos =
-    { file; package; clos }
+  let create ~file ~package ~funs =
+    { file; package; funs }
 
 end
 
@@ -117,6 +132,7 @@ module Context = struct
   type t = {
     file : string;
     package : string option;
+    stack : t list;
     id : int;
     vars : Closure.var list;
     mutable ret : Type.t;
@@ -126,11 +142,15 @@ module Context = struct
   let create file =
     { file;
       package = None;
+      stack = [];
       id = 0;
       vars = [];
       ret = Type.unit;
       prog = None;
     }
+
+  let create_sub ctx =
+    { ctx with stack = ctx :: ctx.stack }
 
   let gen_id ctx =
     let id = ctx.id + 1 in
@@ -140,9 +160,6 @@ module Context = struct
     let ctx, id = gen_id ctx in
     let var = { Closure.var_id = id; var_ty = ty } in
     { ctx with vars = var :: ctx.vars }, id
-
-  let to_clos ctx ~parent ~name ~ops =
-    Closure.create ~parent ~name ~vars:ctx.vars ~ops
 
 end
 
@@ -156,19 +173,58 @@ module Compiler = struct
     match node with
     | `Chunk chunk ->
       let ctx, _ = compile_fold ctx chunk.ch_attrs in
-      let ctx, clos = compile_block ctx
-          ~parent:None
-          ~name:None
-          ~ops:chunk.ch_block in
-      Printf.printf "clos vars = %d\n" (List.length clos.vars);
+      let ctx, funs =
+        List.fold_left chunk.ch_stats
+          ~init:(ctx, [])
+          ~f:(fun (ctx, funs) node ->
+              let ctx, op = compile_node ctx node in
+              match op with
+              | Fundef def ->
+                let func = Closure.of_fundef def in
+                ctx, func :: funs
+              | _ ->
+                Printf.printf "\n";
+                Ast.print node;
+                failwith "invalid node")
+      in
       ctx.prog <- Some (Program.create
                           ~file:ctx.file
                           ~package:ctx.package
-                          ~clos);
+                          ~funs);
       ctx, Nop
 
     | `Package name ->
       { ctx with package = Some name.desc }, Nop
+
+    | `Fundef def ->
+        (*
+  fdef_name : text;
+  fdef_params : text list;
+  fdef_block : t list;
+  mutable fdef_param_types : Type.t list option;
+  mutable fdef_type : Type.t option;
+         *)
+      (* TODO: fun type *)
+      let ctx, id =
+        match def.fdef_name.desc with
+        | "main" -> ctx, "main"
+        | _ -> new_var ctx Type.unit
+      in 
+      let ctx, rev_params = List.fold_left def.fdef_params
+          ~init:(ctx, [])
+          (* TODO: param types *)
+          ~f:(fun (ctx, ids) param ->
+              let ctx, id = new_var ctx Type.unit in
+              ctx, id :: ids)
+      in
+      let params = List.rev rev_params in
+      let ctx, block = compile_fold ctx def.fdef_block in
+      ctx, Fundef {
+        fdef_id = id;
+        fdef_params = params;
+        fdef_block = block;
+        fdef_ty = Type.unit;
+      }
 
     | `Vardef def ->
       let ctx, id = new_var ctx @@ Ast.type_exn def.vdef_exp in
@@ -273,11 +329,6 @@ module Compiler = struct
 
   and compile_ptn' ctx ptn =
     snd @@ compile_ptn ctx ptn
-
-  and compile_block ctx ~parent ~name ~ops : Context.t * Closure.t =
-    let ctx', ops = compile_fold ctx ops in
-    let blk = Context.to_clos ctx' ~parent ~name ~ops in
-    ctx', blk
 
   let run file node =
     let ctx = Context.create file in

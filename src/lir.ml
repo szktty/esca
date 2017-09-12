@@ -97,8 +97,7 @@ module Program = struct
     out : string;
     pkg : string option;
     vars : string list; (* TODO: var type *)
-    top : Op.fundef;
-    subs : Op.fundef list; (* TODO *)
+    funs : Op.fundef list;
   }
 
   let basic_pkgs = [
@@ -106,8 +105,8 @@ module Program = struct
     "lib/kernel";
   ]
 
-  let create ~src ~out ~pkg ~vars ~top ~subs =
-    { src; out; pkg; vars; top; subs }
+  let create ~src ~out ~pkg ~vars ~funs =
+    { src; out; pkg; vars; funs }
 
   let ext = ".go"
 
@@ -123,7 +122,7 @@ module Program = struct
     let buf = Buffer.create 16 in
     write_pkg buf prog;
     write_import buf prog;
-    write_fun buf prog.top;
+    List.iter prog.funs ~f:(write_fun buf);
     let code = contents buf in
     Printf.printf "golang = %s\n" (contents buf);
     Printf.printf "out = %s\n" prog.out;
@@ -305,7 +304,7 @@ module Compiler = struct
   let rec compile_clos ctx (clos:Hir.Closure.t) =
     Printf.printf "LIR: compile closure\n";
     let open Context in
-    compile_ops ctx clos.ops;
+    compile_block ctx clos.block;
     let vars = List.rev_map ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
     { Op.fdef_name = "main";
@@ -327,7 +326,7 @@ module Compiler = struct
             compile_ptn ctx val_reg cls.sw_cls_ptn;
             let dest = new_label ctx in
             add ctx @@ Branch { br_cond = false; br_dest = dest };
-            compile_ops ctx cls.sw_cls_action;
+            compile_block ctx cls.sw_cls_action;
             add ctx @@ Label dest;
             ());
       ()
@@ -373,7 +372,7 @@ module Compiler = struct
         compile_op ctx op;
         f op)
 
-  and compile_ops (ctx:Context.t) (ops:Hir.Op.t list) =
+  and compile_block (ctx:Context.t) (ops:Hir.Op.t list) =
     compile_iter ctx ops ~f:ignore
 
   and compile_fold (ctx:Context.t)
@@ -400,16 +399,13 @@ module Compiler = struct
 
   let run (prog:Hir.Program.t) =
     let ctx = Context.create prog.file in
-
-    (* top-level *)
-    let top = compile_clos ctx prog.clos in
+    let funs = List.map prog.funs ~f:(fun clos -> compile_clos ctx clos) in
     let prog = Program.create
         ~src:prog.file
         ~out:((Filename.chop_extension prog.file) ^".go")
         ~pkg:None
         ~vars:[]
-        ~top
-        ~subs:[]
+        ~funs
     in
     Program.write prog
 

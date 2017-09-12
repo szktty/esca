@@ -60,7 +60,7 @@ let rec write chan (node:Ast_intf.t) =
   | `Chunk chunk ->
     output_string "(chunk ";
     write_nodes chunk.ch_attrs;
-    write_nodes chunk.ch_block;
+    write_nodes chunk.ch_stats;
     output_string ")"
   | `Package name ->
     output_string "(package ";
