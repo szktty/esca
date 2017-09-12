@@ -146,7 +146,7 @@ let desc_fun params ret =
   app ~args:(List.append params [ret]) `Fun
 let desc_fun_printf = app `Fun_printf
 let desc_stream = app `Stream
-let desc_prim name ty = app @@ `Prim { prim_name = name; prim_type = ty }
+let desc_prim name ty = app (`Prim { prim_name = name; prim_type = ty })
 
 let unit = Located.less desc_unit
 let bool = Located.less desc_bool
