@@ -106,6 +106,7 @@ module Program = struct
     pkg : string option;
     vars : string list; (* TODO: var type *)
     funs : Op.fundef list;
+    main : string option;
   }
 
   let basic_pkgs = [
@@ -113,8 +114,8 @@ module Program = struct
     "lib/kernel";
   ]
 
-  let create ~src ~out ~pkg ~vars ~funs =
-    { src; out; pkg; vars; funs }
+  let create ~src ~out ~pkg ~vars ~funs ~main =
+    { src; out; pkg; vars; funs; main }
 
   let ext = ".go"
 
@@ -131,6 +132,7 @@ module Program = struct
     write_pkg buf prog;
     write_import buf prog;
     List.iter prog.funs ~f:(write_fun buf);
+    write_main buf prog;
     let code = contents buf in
     Printf.printf "golang = %s\n" (contents buf);
     Printf.printf "out = %s\n" prog.out;
@@ -139,9 +141,10 @@ module Program = struct
 
   and write_pkg buf prog =
     let open Buffer in
-    add_string buf "package ";
-    add_string buf @@ Option.value prog.pkg ~default:"main";
-    add_string buf "\n\n";
+    Option.iter prog.main ~f:(fun _ ->
+        add_string buf "package ";
+        add_string buf @@ Option.value prog.pkg ~default:"main";
+        add_string buf "\n\n")
 
   and write_import buf _prog =
     let open Buffer in
@@ -150,6 +153,11 @@ module Program = struct
       ~f:(fun pkg ->
           add_string buf @@ sprintf ". \"%s/%s\"\n" !Config.runlib_path pkg);
     add_string buf ")\n\n"
+
+  and write_main buf prog =
+    let open Buffer in
+    Option.iter prog.main ~f:(fun reg ->
+        add_string buf @@ sprintf "func main() { %s() }" reg)
 
   and decl_var buf name ty =
     let open Buffer in
@@ -236,9 +244,6 @@ module Program = struct
     add_string buf "func ";
     add_string buf id;
     add_string buf "() ";
-    if id <> "main" then begin
-      add_string buf @@ Raw_type.to_string func.fdef_ret;
-    end;
     add_string buf " {\n";
 
     (* flag Register.id *)
@@ -267,6 +272,7 @@ module Context = struct
     rc : Register.t;
     flag : Register.id;
     labels : label list;
+    main : Register.t option;
   }
 
   let create src =
@@ -278,6 +284,7 @@ module Context = struct
       rc = r0;
       flag = "fr";
       labels = [l0];
+      main = None;
     }
 
   let add_reg ctx reg =
@@ -289,6 +296,9 @@ module Context = struct
     let reg = Register.create id ty in
     let ctx = add_reg ctx reg in
     { ctx with rc = reg }, reg
+
+  let set_main ctx reg =
+    { ctx with main = Some reg }
 
   let new_label ctx =
     let n = List.length ctx.labels in
@@ -314,7 +324,6 @@ module Context = struct
       ctx_regs = ctx.regs;
       ctx_flag = ctx.flag }
 
-
 end
 
 module Compiler = struct
@@ -327,7 +336,12 @@ module Compiler = struct
     let vars = List.rev_map clos_ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
     let clos_ctx = finish clos_ctx in
-    let ctx, reg = new_reg clos_ctx (Raw_type.of_type clos.var.ty) in
+    let ctx, reg = new_reg ctx (Raw_type.of_type clos.var.ty) in
+    Printf.printf "closure reg = %s\n" reg.id;
+    let ctx = if clos.var.id = "main" then
+        set_main ctx reg
+      else
+        ctx in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
                  fdef_reg = reg;
                  fdef_params = [];
@@ -424,16 +438,18 @@ module Compiler = struct
 
   let run (prog:Hir.Program.t) =
     let ctx = Context.create prog.file in
-    let funs = List.map prog.funs
-        ~f:(fun clos ->
-            let _, clos' = compile_clos ctx clos in
-            clos') in
+    let ctx, funs = List.fold_left prog.funs
+        ~init:(ctx, [])
+        ~f:(fun (ctx, accu) clos ->
+            let ctx, clos' = compile_clos ctx clos in
+            ctx, clos' :: accu) in
     let prog = Program.create
         ~src:prog.file
         ~out:((Filename.chop_extension prog.file) ^".go")
         ~pkg:None
         ~vars:[]
         ~funs
+        ~main:(Option.map ctx.main ~f:(fun reg -> reg.id))
     in
     Program.write prog
 
