@@ -1,0 +1,4 @@
+.PHONY: all install uninstall clean
+
+.SUBDIRS: src
+
