@@ -10,6 +10,8 @@ val create :
 
 val find : 'a t -> string -> 'a option
 
+val import : 'a t -> 'a Module.t -> 'a t
+
 val add : 'a t -> key:string -> data:'a ->'a t
 
 val merge : 'a t -> 'a String.Map.t ->'a t

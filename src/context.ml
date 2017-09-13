@@ -11,16 +11,16 @@ let value_imports : Type.t Module.t list ref = ref []
 let find_module ?(path=[]) tops ~name =
   match path with
   | [] -> List.find tops ~f:(fun m -> Module.name m = name)
-  | fst :: rest ->
+  | _ :: rest ->
     match List.find tops ~f:(fun m -> Module.name m = name) with
     | None -> None
     | Some m -> Module.find_module m ~prefix:rest ~name
 
-let find_type_module path =
-  find_module !type_modules path
+let find_type_module name =
+  find_module !type_modules ~name
 
-let find_value_module path =
-  find_module !value_modules path
+let find_value_module name =
+  find_module !value_modules ~name
 
 let top_module_names mods =
   List.fold_left mods

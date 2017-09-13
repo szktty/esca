@@ -13,7 +13,7 @@ let create ?(imports=[]) ?attrs () =
 let import env m =
   { env with imports = m :: env.imports }
 
-let rec find env key =
+let find env key =
   match String.Map.find env.attrs key with
   | Some _ as res -> res
   | None -> List.find_mapi env.imports
@@ -23,7 +23,7 @@ let add env ~key ~data =
   { env with attrs = String.Map.add env.attrs ~key ~data }
 
 let concat env =
-  let rec f attrs accu =
+  let f attrs accu =
     String.Map.fold attrs ~init:accu
       ~f:(fun ~key ~data accu -> String.Map.add accu ~key ~data)
   in
@@ -31,7 +31,7 @@ let concat env =
 
 let merge env src =
   { env with attrs = String.Map.merge env.attrs src
-                 ~f:(fun ~key owner ->
+                 ~f:(fun ~key:_ owner ->
                      match owner with
                      | `Left v | `Right v -> Some v
                      | `Both (_, v2) -> Some v2)

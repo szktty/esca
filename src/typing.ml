@@ -79,7 +79,7 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
     Located.create ty.loc @@ `App (tycon, args')
   | `Poly (tyvars, ty') ->
     let tyvars' = List.mapi tyvars
-        ~f:(fun i tyvar ->
+        ~f:(fun i _tyvar ->
             Array.get Type.var_names (i + List.length env))
     in
     let ty'' = subst ty' @@ List.map2_exn tyvars tyvars'
@@ -273,9 +273,9 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
         let fun_ty = Type.fun_ (Some loc) params ret in
         fdef.fdef_type <- Some fun_ty;
         (* for recursive call *)
-        let env = Env.add env fdef.fdef_name.desc fun_ty in
+        let env = Env.add env ~key:fdef.fdef_name.desc ~data:fun_ty in
         let fenv = List.fold2_exn fdef.fdef_params params ~init:env
-            ~f:(fun env name ty -> Env.add env name.desc ty)
+            ~f:(fun env name ty -> Env.add env ~key:name.desc ~data:ty)
         in
         let _, ret' = infer_block fenv fdef.fdef_block in
         unify ~ex:ret ~ac:ret';
@@ -352,7 +352,7 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
           | `Fpos | `Fneg -> (Type.float, Type.float)
           | _ -> failwith "not yet supported"
         in
-        unify op_ty (easy_infer env e);
+        unify ~ex:op_ty ~ac:(easy_infer env e);
         (env, val_ty.desc)
 
       | `Binexp { binexp_left = e1; binexp_op = op; binexp_right = e2 } ->
@@ -370,8 +370,8 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
             (Type.float, Type.float)
           | _ -> failwith "not yet supported"
         in
-        unify op_ty (easy_infer env e1);
-        unify op_ty (easy_infer env e2);
+        unify ~ex:op_ty ~ac:(easy_infer env e1);
+        unify ~ex:op_ty ~ac:(easy_infer env e2);
         (env, val_ty.desc)
 
                 (*

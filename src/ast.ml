@@ -1,5 +1,4 @@
 open Core.Std
-open Located
 
 include Ast_intf
 
@@ -32,7 +31,6 @@ let location = function
 
 let write_list chan es ~f =
   let open Out_channel in
-  let open Printf in
   output_string chan "[";
   ignore @@ List.fold_left es
     ~f:(fun rest e ->
@@ -246,7 +244,6 @@ and write_ptn chan ptn =
 
 and write_tyexp chan tyexp =
   let open Located in
-  let open Type in
 
   let write_list es =
     List.iter es ~f:(fun arg ->

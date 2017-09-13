@@ -143,7 +143,7 @@ module Program = struct
     add_string buf @@ Option.value prog.pkg ~default:"main";
     add_string buf "\n\n";
 
-  and write_import buf prog =
+  and write_import buf _prog =
     let open Buffer in
     add_string buf "import (\n";
     List.iter basic_pkgs

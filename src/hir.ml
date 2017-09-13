@@ -307,13 +307,13 @@ module Compiler = struct
     let open Op in
 
     let fold ctx ptns ~f =
-      let ctx', rev_ptns =
+      let ctx, rev_ptns =
         List.fold_left ptns
           ~init:(ctx, [])
           ~f:(fun (ctx, accu) ptn ->
-              let ctx', ptn' = compile_ptn ctx ptn in
+              let ctx, ptn' = compile_ptn ctx ptn in
               ctx, ptn' :: accu) in
-      ctx', f @@ List.rev rev_ptns
+      ctx, f @@ List.rev rev_ptns
     in
 
     match ptn.ptn_cls with

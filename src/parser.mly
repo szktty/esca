@@ -15,9 +15,6 @@ let create_unexp op_loc op exp =
   let op = create (Some op_loc) op in
   `Unexp { unexp_op = op; unexp_exp = exp; unexp_type = None }
 
-let create_exp exp =
-  { exp = exp; exp_type = None }
-
 %}
 
 %token <Ast.text> IDENT
