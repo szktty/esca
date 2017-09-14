@@ -24,6 +24,7 @@ module Op = struct
     | Block of t list
     | Call of call
     | Var of Var.t
+    | Ref of ref_var
     | Prim of primitive
     | Null
     | Bool of bool
@@ -33,7 +34,8 @@ module Op = struct
     | List of t list
 
   and fundef = {
-    fdef_var : Var.t;
+    fdef_var : Var.t; (* TODO: need? *)
+    fdef_name : string;
     fdef_params : Var.t list;
     fdef_block : t list;
   }
@@ -47,6 +49,11 @@ module Op = struct
   and assign = {
     asn_var : t;
     asn_exp : t;
+  }
+
+  and ref_var = {
+    ref_var : Var.t;
+    ref_name : string; (* TODO: namepath *)
   }
 
   and switch = {
@@ -95,18 +102,20 @@ module Closure = struct
   type t = {
     parent : t option;
     var : Var.t;
+    name : string;
     params : Var.t list;
     block : Op.t list;
     (* ret : Type.t; *)
   }
 
-  let create ~parent ~var ~params ~block =
-    { parent; var; params; block }
+  let create ~parent ~var ~name ~params ~block =
+    { parent; var; name; params; block }
 
   let of_fundef (def:Op.fundef) =
     create
       ~parent:None
       ~var:def.fdef_var
+      ~name:def.fdef_name
       ~params:[]
       ~block: def.fdef_block
 
@@ -161,6 +170,10 @@ module Context = struct
     let ctx, id = gen_id ctx in
     let var = { Var.id = id; ty = ty } in
     { ctx with vars = var :: ctx.vars }, var
+
+  let new_ref ctx ty name =
+    let ctx, var = new_var ctx ty in
+    ctx, { Op.ref_var = var; ref_name = name }
 
   (* TODO: type *)
   let main_fun = { Var.id = "main"; ty = Type.unit }
@@ -222,6 +235,7 @@ module Compiler = struct
       let ctx' = add_var ctx fun_var in
       ctx', Fundef {
         fdef_var = fun_var;
+        fdef_name = def.fdef_name.desc;
         fdef_params = params;
         fdef_block = block;
       }
@@ -276,8 +290,9 @@ module Compiler = struct
         | Some name ->
           ctx, Prim { prim_name = name; prim_ty = ty }
         | None ->
-          let ctx, var = new_var ctx ty in
-          ctx, Var var
+          (* TODO: namepath *)
+          let ctx, ref = new_ref ctx ty var.var_name.desc in
+          ctx, Ref ref
       end
 
     | `Bool value -> ctx, Bool value.desc

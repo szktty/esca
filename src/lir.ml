@@ -48,6 +48,7 @@ module Op = struct
     | Block of t list
     | Terminal
     | Var of var
+    | Ref of ref_var
     | Prim of primitive
     | Null
     | Bool of bool
@@ -74,7 +75,7 @@ module Op = struct
 
   and fundef = {
     fdef_ctx : context;
-    fdef_reg : Register.t;
+    fdef_name : string;
     fdef_params : var list;
     fdef_vars : var list;
     fdef_body : t list;
@@ -83,6 +84,11 @@ module Op = struct
 
   and var = {
     var_reg : Register.t;
+  }
+
+  and ref_var = {
+    ref_var : Register.t;
+    ref_name : string; (* TODO: namepath *)
   }
 
   and call = {
@@ -225,6 +231,9 @@ module Program = struct
       let bridge = bridge_prim_name prim.prim_name in
       with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
 
+    | Ref ref ->
+      addln @@ sprintf "%s = %s" ref.ref_var.id ref.ref_name
+
     | Null -> add "null"
 
     | Int (reg, value) ->
@@ -240,9 +249,8 @@ module Program = struct
 
   and write_fun buf func =
     let open Buffer in
-    let id = func.fdef_reg.id in
     add_string buf "func ";
-    add_string buf id;
+    add_string buf func.fdef_name;
     add_string buf "() ";
     add_string buf " {\n";
 
@@ -272,7 +280,7 @@ module Context = struct
     rc : Register.t;
     flag : Register.id;
     labels : label list;
-    main : Register.t option;
+    main : Register.t option; (* TODO: unused? *)
   }
 
   let create src =
@@ -290,12 +298,15 @@ module Context = struct
   let add_reg ctx reg =
     { ctx with regs = reg :: ctx.regs }
 
-  let new_reg ctx ty =
+  let new_reg ~prefix ctx ty =
     let n = List.length ctx.regs in
-    let id = Printf.sprintf "r%d" n in
+    let id = Printf.sprintf "%s%d" prefix n in
     let reg = Register.create id ty in
     let ctx = add_reg ctx reg in
     { ctx with rc = reg }, reg
+
+  let new_var_reg ctx ty =
+    new_reg ~prefix:"t" ctx ty
 
   let set_main ctx reg =
     { ctx with main = Some reg }
@@ -309,7 +320,7 @@ module Context = struct
     { ctx with ops = op :: ctx.ops }
 
   let add_op_with_reg ctx ty ~f =
-    let ctx, reg = new_reg ctx ty in
+    let ctx, reg = new_var_reg ctx ty in
     add_op ctx @@ f reg
 
   let move ctx from to_ =
@@ -336,14 +347,8 @@ module Compiler = struct
     let vars = List.rev_map clos_ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
     let clos_ctx = finish clos_ctx in
-    let ctx, reg = new_reg ctx (Raw_type.of_type clos.var.ty) in
-    Printf.printf "closure reg = %s\n" reg.id;
-    let ctx = if clos.var.id = "main" then
-        set_main ctx reg
-      else
-        ctx in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
-                 fdef_reg = reg;
+                 fdef_name = clos.name;
                  fdef_params = [];
                  fdef_vars = vars;
                  fdef_body = clos_ctx.ops;
@@ -372,6 +377,7 @@ module Compiler = struct
       Printf.printf "LIR: compile call\n";
       let ctx = compile_op ctx call.call_fun in
       let fun_reg = ctx.rc in
+      Printf.printf "LIR: call fun %s\n" fun_reg.id;
       let ctx, arg_regs = compile_exps ctx call.call_args in
       add_op_with_reg ctx fun_reg.ty
         ~f:(fun reg -> Call { call_rc = reg;
@@ -379,16 +385,21 @@ module Compiler = struct
                               call_args = arg_regs })
 
     | Prim prim ->
-      let ctx, reg = new_reg ctx (Raw_type.of_type prim.prim_ty) in
+      let ctx, reg = new_var_reg ctx (Raw_type.of_type prim.prim_ty) in
       add_op ctx @@ Prim {
         prim_rc = reg;
         prim_name = prim.prim_name;
       }
 
     | Var var ->
-      Printf.printf "compile var\n";
+      Printf.printf "LIR: compile var: %s\n" var.id;
       add_op_with_reg ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Var { var_reg = reg })
+
+    | Ref ref ->
+      Printf.printf "LIR: compile ref: %s\n" ref.ref_name;
+      add_op_with_reg ctx (Raw_type.of_type ref.ref_var.ty)
+        ~f:(fun reg -> Ref { ref_var = reg; ref_name = ref.ref_name })
 
     | Int value ->
       add_op_with_reg ctx Raw_type.Int
@@ -402,17 +413,9 @@ module Compiler = struct
     | _ -> ctx
 
   and compile_block (ctx:Context.t) (ops:Hir.Op.t list) =
-    Printf.printf "# begin compile_block ops: %d, %d\n"
-      (List.length ops)
-      (List.length ctx.ops);
     List.fold_left ops
       ~init:ctx
-      ~f:(fun ctx op ->
-          Printf.printf "# compile_block ops: %d\n" (List.length ctx.ops);
-          let ctx = compile_op ctx op in
-          Printf.printf "# end compile_block ops: %d\n" (List.length ctx.ops);
-          ctx 
-        )
+      ~f:(fun ctx op -> compile_op ctx op)
 
   and compile_exps (ctx:Context.t) (ops:Hir.Op.t list) =
     let ctx, regs =
