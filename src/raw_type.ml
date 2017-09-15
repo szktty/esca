@@ -80,3 +80,10 @@ let rec to_string = function
     add_string buf @@ to_string ret;
     contents buf
   | _ -> failwith "not impl"
+
+let return_ty = function
+  | Fun (_, ret) -> Some ret
+  | _ -> None
+
+let return_ty_exn ty =
+  Option.value_exn (return_ty ty)

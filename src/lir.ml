@@ -42,6 +42,7 @@ module Op = struct
     | Branch of branch
     | Jump of label
     | Return of Register.t
+    | Void_return
     | Label of label
 
     | Call of call
@@ -101,6 +102,11 @@ module Op = struct
     prim_rc : Register.t;
     prim_name : string;
   }
+
+  let special_fun = function
+    | "main" -> `Main
+    | "init" -> `Init
+    | name -> `Fun name
 
 end
 
@@ -221,6 +227,9 @@ module Program = struct
     | Return reg ->
       addln @@ sprintf "return %s" reg.id
 
+    | Void_return ->
+      addln @@ sprintf "return"
+
     | Call call ->
       Printf.printf "call\n";
       with_exp buf call.call_rc.id
@@ -252,18 +261,12 @@ module Program = struct
 
   and write_fun buf func =
     let open Buffer in
-    let spec =
-      match func.fdef_name with
-      | "main" -> `Main
-      | "init" -> `Init
-      | name -> `Generic name
-    in
+    let spec = Op.special_fun func.fdef_name in
     add_string buf @@ sprintf "func %s(" func.fdef_name;
     add_string buf @@ sprintf ") ";
     begin match spec with
       | `Main | `Init -> ()
-      | `Generic _ ->
-        add_string buf @@ (Raw_type.to_string func.fdef_ret)
+      | `Fun _ -> add_string buf @@ (Raw_type.to_string func.fdef_ret)
     end;
     add_string buf " {\n";
 
@@ -356,8 +359,14 @@ module Compiler = struct
     Printf.printf "LIR: compile closure '%s'\n" clos.var.id;
     let open Context in
     let clos_ctx = compile_block ctx clos.block in
-    (* return last value *)
-    let clos_ctx = add_op clos_ctx @@ Return clos_ctx.rc in
+
+    (* return value *)
+    let clos_ctx =
+      match Op.special_fun clos.var.id with
+      | `Fun _ -> add_op clos_ctx @@ Return clos_ctx.rc
+      | `Main | `Init -> add_op clos_ctx @@ Void_return
+    in
+
     let vars = List.rev_map clos_ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
     let clos_ctx = finish clos_ctx in
@@ -393,7 +402,7 @@ module Compiler = struct
       let fun_reg = ctx.rc in
       Printf.printf "LIR: call fun %s\n" fun_reg.id;
       let ctx, arg_regs = compile_exps ctx call.call_args in
-      add_op_with_reg ctx fun_reg.ty
+      add_op_with_reg ctx (Raw_type.return_ty_exn fun_reg.ty)
         ~f:(fun reg -> Call { call_rc = reg;
                               call_fun = fun_reg;
                               call_args = arg_regs })
