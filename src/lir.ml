@@ -330,7 +330,7 @@ module Context = struct
     let ctx = add_reg ctx reg in
     { ctx with rc = reg }, reg
 
-  let new_var_reg ctx ty =
+  let new_var ctx ty =
     new_reg ~prefix:"t" ctx ty
 
   let set_main ctx reg =
@@ -344,8 +344,8 @@ module Context = struct
   let add_op ctx op =
     { ctx with ops = op :: ctx.ops }
 
-  let add_op_with_reg ctx ty ~f =
-    let ctx, reg = new_var_reg ctx ty in
+  let add_var_op ctx ty ~f =
+    let ctx, reg = new_var ctx ty in
     add_op ctx @@ f reg
 
   let move ctx from to_ =
@@ -372,7 +372,7 @@ module Compiler = struct
     let clos_ctx, params = List.fold_left clos.params
         ~init:(ctx, [])
         ~f:(fun (ctx, params) var ->
-            let ctx, reg = new_var_reg ctx (Raw_type.of_type var.ty) in
+            let ctx, reg = new_var ctx (Raw_type.of_type var.ty) in
             ctx, { Op.var_reg = reg } :: params)
     in
     let params = List.rev params in
@@ -421,13 +421,13 @@ module Compiler = struct
       let fun_reg = ctx.rc in
       Printf.printf "LIR: call fun %s\n" fun_reg.id;
       let ctx, arg_regs = compile_exps ctx call.call_args in
-      add_op_with_reg ctx (Raw_type.return_ty_exn fun_reg.ty)
+      add_var_op ctx (Raw_type.return_ty_exn fun_reg.ty)
         ~f:(fun reg -> Call { call_rc = reg;
                               call_fun = fun_reg;
                               call_args = arg_regs })
 
     | Prim prim ->
-      let ctx, reg = new_var_reg ctx (Raw_type.of_type prim.prim_ty) in
+      let ctx, reg = new_var ctx (Raw_type.of_type prim.prim_ty) in
       add_op ctx @@ Prim {
         prim_rc = reg;
         prim_name = prim.prim_name;
@@ -435,21 +435,21 @@ module Compiler = struct
 
     | Var var ->
       Printf.printf "LIR: compile var: %s\n" var.id;
-      add_op_with_reg ctx (Raw_type.of_type var.ty)
+      add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Var { var_reg = reg })
 
     | Ref ref ->
       Printf.printf "LIR: compile ref: %s\n" ref.ref_name;
-      add_op_with_reg ctx (Raw_type.of_type ref.ref_var.ty)
+      add_var_op ctx (Raw_type.of_type ref.ref_var.ty)
         ~f:(fun reg -> Ref { ref_var = reg; ref_name = ref.ref_name })
 
     | Int value ->
-      add_op_with_reg ctx Raw_type.Int
+      add_var_op ctx Raw_type.Int
         ~f:(fun reg -> Int (reg, value))
 
     | String value ->
       Printf.printf "LIR: compile string\n";
-      add_op_with_reg ctx Raw_type.String
+      add_var_op ctx Raw_type.String
         ~f:(fun reg -> String (reg, value))
 
     | _ -> ctx
