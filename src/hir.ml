@@ -24,7 +24,8 @@ module Op = struct
     | Block of t list
     | Call of call
     | Var of Var.t
-    | Ref of ref_var
+    | Ref_fun of Var.t
+    | Ref_var of Var.t
     | Prim of primitive
     | Null
     | Bool of bool
@@ -49,11 +50,6 @@ module Op = struct
   and assign = {
     asn_var : t;
     asn_exp : t;
-  }
-
-  and ref_var = {
-    ref_var : Var.t;
-    ref_name : string; (* TODO: namepath *)
   }
 
   and switch = {
@@ -142,6 +138,7 @@ module Context = struct
     stack : t list;
     id : int;
     vars : Var.t list;
+    var_map : Var.t String.Map.t;
     mutable ret : Type.t;
     mutable prog : Program.t option;
   }
@@ -152,6 +149,7 @@ module Context = struct
       stack = [];
       id = 0;
       vars = [];
+      var_map = String.Map.empty;
       ret = Type.unit;
       prog = None;
     }
@@ -166,14 +164,27 @@ module Context = struct
   let add_var ctx var =
     { ctx with vars = var :: ctx.vars }
 
-  let new_var ctx ty =
+  let new_var ?name ctx ty =
     let ctx, id = gen_id ctx in
     let var = { Var.id = id; ty = ty } in
+    let ctx = match name with
+      | None -> ctx
+      | Some name -> { ctx with
+                       var_map = String.Map.add ctx.var_map
+                           ~key:name
+                           ~data:var }
+    in
     { ctx with vars = var :: ctx.vars }, var
 
   let new_ref ctx ty name =
     let ctx, var = new_var ctx ty in
-    ctx, { Op.ref_var = var; ref_name = name }
+    let ctx = { ctx with var_map = String.Map.add ctx.var_map
+                             ~key:name
+                             ~data:var } in
+    ctx, var 
+
+  let get_var ctx name =
+    String.Map.find ctx.var_map name
 
   (* TODO: type *)
   let main_fun = { Var.id = "main"; ty = Type.unit }
@@ -222,16 +233,19 @@ module Compiler = struct
         | "main" -> fun_ctx, main_fun
         | _ -> new_var fun_ctx @@ Option.value_exn def.fdef_type
       in 
-      let params = Type.fun_params @@ Option.value_exn def.fdef_type in
+
+      (* parameters *)
+      let param_tys = Type.fun_params @@ Option.value_exn def.fdef_type in
       let fun_ctx, rev_params =
-        List.fold_left params
+        List.fold2_exn def.fdef_params param_tys
           ~init:(fun_ctx, [])
-          ~f:(fun (ctx, vars) ty ->
-              let ctx, var = new_var ctx ty in
+          ~f:(fun (ctx, vars) name ty ->
+              let ctx, var = new_var ctx ty ~name:name.desc in
               ctx, var :: vars)
       in
       let params = List.rev rev_params in
       Printf.printf"HIR: fundef params = %d\n" (List.length params);
+
       let _, block = compile_fold fun_ctx def.fdef_block in
       let ctx' = add_var ctx fun_var in
       ctx', Fundef {
@@ -285,15 +299,17 @@ module Compiler = struct
                   call_ty = Type.unit }
 
     | `Var var ->
-      Printf.printf "HIR: compile var\n";
+      let name = var.var_name.desc in
+      Printf.printf "HIR: compile var '%s'\n" name;
       let ty = Type.unwrap @@ Option.value_exn var.var_type in
       begin match Type.prim_name ty with
         | Some name ->
           ctx, Prim { prim_name = name; prim_ty = ty }
         | None ->
           (* TODO: namepath *)
-          let ctx, ref = new_ref ctx ty var.var_name.desc in
-          ctx, Ref ref
+          match get_var ctx name with
+          | None -> ctx, Ref_fun { Var.id = name; ty }
+          | Some var -> ctx, Ref_var var
       end
 
     | `Bool value -> ctx, Bool value.desc

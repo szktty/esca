@@ -56,7 +56,8 @@ module Op = struct
     | Block of t list
     | Terminal
     | Var of Register.t
-    | Ref of ref_var
+    | Ref_fun of ref_fun
+    | Ref_var of ref_var
     | Prim of primitive
     | Null
     | Bool of bool
@@ -90,9 +91,14 @@ module Op = struct
     fdef_ret : Raw_type.t;
   }
 
+  and ref_fun = {
+    ref_fun_from : string;
+    ref_fun_to : Register.t;
+  }
+
   and ref_var = {
-    ref_var : Register.t;
-    ref_name : string; (* TODO: namepath *)
+    ref_from : Register.t;
+    ref_to : Register.t;
   }
 
   and call = {
@@ -246,8 +252,11 @@ module Program = struct
       let bridge = bridge_prim_name prim.prim_name in
       with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
 
-    | Ref ref ->
-      addln @@ sprintf "%s = %s" ref.ref_var.id ref.ref_name
+    | Ref_fun ref ->
+      addln @@ sprintf "%s = %s" ref.ref_fun_to.id ref.ref_fun_from
+
+    | Ref_var ref ->
+      addln @@ sprintf "%s = %s" ref.ref_to.id ref.ref_from.id
 
     | Null -> add "null"
 
@@ -304,6 +313,7 @@ module Context = struct
     src : string;
     ops : Op.t list;
     locals : Register.t list;
+    local_map : Register.t String.Map.t;
     rc : Register.t;
     flag : Register.id;
     labels : label list;
@@ -316,14 +326,21 @@ module Context = struct
     { src;
       ops = [];
       locals = [];
+      local_map = String.Map.empty;
       rc = r0;
       flag = "fr";
       labels = [];
       main = None;
     }
 
+  let add_local_map ctx name reg =
+    { ctx with local_map =
+                 String.Map.add ctx.local_map ~key:name ~data:reg }
+
   let add_reg ctx reg =
-    { ctx with locals = reg :: ctx.locals }
+    { ctx with locals = reg :: ctx.locals;
+               local_map = String.Map.add ctx.local_map
+                   ~key:reg.id ~data:reg }
 
   let new_reg ctx ty ~prefix ~scope =
     let n = List.length ctx.locals in
@@ -332,11 +349,15 @@ module Context = struct
     let ctx = add_reg ctx reg in
     { ctx with rc = reg }, reg
 
-  let new_param ctx ty =
-    new_reg ctx ty ~prefix:"t" ~scope:`Param
+  let new_param ctx ~ty ~name =
+    let ctx, reg = new_reg ctx ty ~prefix:"t" ~scope:`Param in
+    add_local_map ctx name reg, reg
 
   let new_local ctx ty =
     new_reg ctx ty ~prefix:"t" ~scope:`Local
+
+  let get_local_exn ctx id =
+    String.Map.find_exn ctx.local_map id
 
   let set_main ctx reg =
     { ctx with main = Some reg }
@@ -378,7 +399,10 @@ module Compiler = struct
     let clos_ctx, rev_params = List.fold_left clos.params
         ~init:(ctx, [])
         ~f:(fun (ctx, params) var ->
-            let ctx, param = new_param ctx (Raw_type.of_type var.ty) in
+            let ctx, param = new_param ctx
+                ~ty:(Raw_type.of_type var.ty)
+                ~name:var.id
+            in
             ctx, param :: params)
     in
     let params = List.rev rev_params in
@@ -442,10 +466,20 @@ module Compiler = struct
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Var reg)
 
-    | Ref ref ->
-      Printf.printf "LIR: compile ref: %s\n" ref.ref_name;
-      add_var_op ctx (Raw_type.of_type ref.ref_var.ty)
-        ~f:(fun reg -> Ref { ref_var = reg; ref_name = ref.ref_name })
+    | Ref_fun var ->
+      Printf.printf "LIR: compile ref fun: %s\n" var.id;
+      add_var_op ctx (Raw_type.of_type var.ty)
+        ~f:(fun reg -> Ref_fun {
+            ref_fun_from = var.id;
+            ref_fun_to = reg;
+          })
+
+    | Ref_var var ->
+      Printf.printf "LIR: compile ref var: %s\n" var.id;
+      add_var_op ctx (Raw_type.of_type var.ty)
+        ~f:(fun reg -> Ref_var {
+            ref_from = get_local_exn ctx var.id;
+            ref_to = reg })
 
     | Int value ->
       add_var_op ctx Raw_type.Int
