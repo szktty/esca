@@ -9,12 +9,19 @@ module Register = struct
   type t = {
     id : id;
     ty : Raw_type.t;
+    param : bool;
   }
 
-  let create id ty = { id; ty }
+  let create ~id ~ty ~param = { id; ty; param }
 
   let ids regs =
     List.map regs ~f:(fun reg -> reg.id)
+
+  let params regs =
+    List.filter regs ~f:(fun reg -> reg.param)
+
+  let locals regs =
+    List.filter regs ~f:(fun reg -> not reg.param)
 
 end
 
@@ -273,6 +280,7 @@ module Program = struct
     in
     add_string buf @@ sprintf "%s) " params;
 
+    (* return value type *)
     begin match spec with
       | `Main | `Init -> ()
       | `Fun _ -> add_string buf @@ (Raw_type.to_string func.fdef_ret)
@@ -310,7 +318,7 @@ module Context = struct
 
   let create src =
     (* dummy *)
-    let r0 = Register.create "r0" Raw_type.Void in
+    let r0 = Register.create ~id:"r0" ~ty:Raw_type.Void ~param:false in
     { src;
       ops = [];
       regs = [];
@@ -323,15 +331,18 @@ module Context = struct
   let add_reg ctx reg =
     { ctx with regs = reg :: ctx.regs }
 
-  let new_reg ~prefix ctx ty =
+  let new_reg ctx ty ~prefix ~param =
     let n = List.length ctx.regs in
     let id = Printf.sprintf "%s%d" prefix n in
-    let reg = Register.create id ty in
+    let reg = Register.create ~id ~ty ~param in
     let ctx = add_reg ctx reg in
     { ctx with rc = reg }, reg
 
+  let new_param ctx ty =
+    new_reg ctx ty ~prefix:"t" ~param:true
+
   let new_var ctx ty =
-    new_reg ~prefix:"t" ctx ty
+    new_reg ctx ty ~prefix:"t" ~param:false
 
   let set_main ctx reg =
     { ctx with main = Some reg }
@@ -352,12 +363,13 @@ module Context = struct
     add_op ctx @@ Move { mv_from = from; mv_to = to_ }
 
   let finish ctx =
-    { ctx with ops = List.rev ctx.ops }
+    { ctx with ops = List.rev ctx.ops;
+               regs = List.rev ctx.regs }
 
   let to_clos_ctx ctx : Op.context =
     { ctx_src = ctx.src;
       ctx_ops = ctx.ops;
-      ctx_regs = ctx.regs;
+      ctx_regs = List.rev ctx.regs;
       ctx_flag = ctx.flag }
 
 end
@@ -372,7 +384,7 @@ module Compiler = struct
     let clos_ctx, params = List.fold_left clos.params
         ~init:(ctx, [])
         ~f:(fun (ctx, params) var ->
-            let ctx, reg = new_var ctx (Raw_type.of_type var.ty) in
+            let ctx, reg = new_param ctx (Raw_type.of_type var.ty) in
             ctx, { Op.var_reg = reg } :: params)
     in
     let params = List.rev params in
@@ -386,9 +398,9 @@ module Compiler = struct
       | `Main | `Init -> add_op clos_ctx @@ Void_return
     in
 
-    let vars = List.rev_map clos_ctx.regs
-        ~f:(fun reg -> { Op.var_reg = reg }) in
     let clos_ctx = finish clos_ctx in
+    let vars = List.map (Register.locals clos_ctx.regs)
+        ~f:(fun reg -> { Op.var_reg = reg }) in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
                  fdef_name = clos.name;
                  fdef_params = params;
