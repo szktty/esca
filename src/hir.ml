@@ -116,7 +116,7 @@ module Closure = struct
       ~parent:None
       ~var:def.fdef_var
       ~name:def.fdef_name
-      ~params:[]
+      ~params:def.fdef_params
       ~block: def.fdef_block
 
 end
@@ -231,6 +231,7 @@ module Compiler = struct
               ctx, var :: vars)
       in
       let params = List.rev rev_params in
+      Printf.printf"HIR: fundef params = %d\n" (List.length params);
       let _, block = compile_fold fun_ctx def.fdef_block in
       let ctx' = add_var ctx fun_var in
       ctx', Fundef {

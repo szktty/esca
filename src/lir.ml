@@ -263,7 +263,16 @@ module Program = struct
     let open Buffer in
     let spec = Op.special_fun func.fdef_name in
     add_string buf @@ sprintf "func %s(" func.fdef_name;
-    add_string buf @@ sprintf ") ";
+
+    (* parameters *)
+    let params =
+      List.map func.fdef_params
+        ~f:(fun var ->
+            sprintf "%s %s" var.var_reg.id (Raw_type.to_string var.var_reg.ty))
+      |> String.concat ~sep:", "
+    in
+    add_string buf @@ sprintf "%s) " params;
+
     begin match spec with
       | `Main | `Init -> ()
       | `Fun _ -> add_string buf @@ (Raw_type.to_string func.fdef_ret)
@@ -358,7 +367,17 @@ module Compiler = struct
   let rec compile_clos ctx (clos:Hir.Closure.t) : Context.t * Op.fundef =
     Printf.printf "LIR: compile closure '%s'\n" clos.var.id;
     let open Context in
-    let clos_ctx = compile_block ctx clos.block in
+
+    (* parameters *)
+    let clos_ctx, params = List.fold_left clos.params
+        ~init:(ctx, [])
+        ~f:(fun (ctx, params) var ->
+            let ctx, reg = new_var_reg ctx (Raw_type.of_type var.ty) in
+            ctx, { Op.var_reg = reg } :: params)
+    in
+    let params = List.rev params in
+
+    let clos_ctx = compile_block clos_ctx clos.block in
 
     (* return value *)
     let clos_ctx =
@@ -372,7 +391,7 @@ module Compiler = struct
     let clos_ctx = finish clos_ctx in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
                  fdef_name = clos.name;
-                 fdef_params = [];
+                 fdef_params = params;
                  fdef_vars = vars;
                  fdef_body = clos_ctx.ops;
                  fdef_ret = Raw_type.Void } in
