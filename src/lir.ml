@@ -55,7 +55,7 @@ module Op = struct
     | Call of call
     | Block of t list
     | Terminal
-    | Var of var
+    | Var of Register.t
     | Ref of ref_var
     | Prim of primitive
     | Null
@@ -84,14 +84,10 @@ module Op = struct
   and fundef = {
     fdef_ctx : context;
     fdef_name : string;
-    fdef_params : var list;
-    fdef_vars : var list;
+    fdef_params : Register.t list;
+    fdef_locals : Register.t list;
     fdef_body : t list;
     fdef_ret : Raw_type.t;
-  }
-
-  and var = {
-    var_reg : Register.t;
   }
 
   and ref_var = {
@@ -275,7 +271,7 @@ module Program = struct
     let params =
       List.map func.fdef_params
         ~f:(fun var ->
-            sprintf "%s %s" var.var_reg.id (Raw_type.to_string var.var_reg.ty))
+            sprintf "%s %s" var.id (Raw_type.to_string var.ty))
       |> String.concat ~sep:", "
     in
     add_string buf @@ sprintf "%s) " params;
@@ -291,12 +287,10 @@ module Program = struct
     decl_var buf flag Raw_type.Bool;
 
     (* declare variables to avoid "goto" error ("jumps over declaration") *)
-    List.iter func.fdef_vars
+    List.iter func.fdef_locals
       ~f:(fun var ->
           add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
-            var.var_reg.id
-            (Raw_type.to_string var.var_reg.ty)
-            var.var_reg.id);
+            var.id (Raw_type.to_string var.ty) var.id);
     add_string buf "\n";
 
     write_ops buf func.fdef_body;
@@ -381,13 +375,13 @@ module Compiler = struct
     let open Context in
 
     (* parameters *)
-    let clos_ctx, params = List.fold_left clos.params
+    let clos_ctx, rev_params = List.fold_left clos.params
         ~init:(ctx, [])
         ~f:(fun (ctx, params) var ->
-            let ctx, reg = new_param ctx (Raw_type.of_type var.ty) in
-            ctx, { Op.var_reg = reg } :: params)
+            let ctx, param = new_param ctx (Raw_type.of_type var.ty) in
+            ctx, param :: params)
     in
-    let params = List.rev params in
+    let params = List.rev rev_params in
 
     let clos_ctx = compile_block clos_ctx clos.block in
 
@@ -399,12 +393,10 @@ module Compiler = struct
     in
 
     let clos_ctx = finish clos_ctx in
-    let vars = List.map (Register.locals clos_ctx.locals)
-        ~f:(fun reg -> { Op.var_reg = reg }) in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
                  fdef_name = clos.name;
                  fdef_params = params;
-                 fdef_vars = vars;
+                 fdef_locals = Register.locals clos_ctx.locals;
                  fdef_body = clos_ctx.ops;
                  fdef_ret = Raw_type.Void } in
     ctx, fdef
@@ -448,7 +440,7 @@ module Compiler = struct
     | Var var ->
       Printf.printf "LIR: compile var: %s\n" var.id;
       add_var_op ctx (Raw_type.of_type var.ty)
-        ~f:(fun reg -> Var { var_reg = reg })
+        ~f:(fun reg -> Var reg)
 
     | Ref ref ->
       Printf.printf "LIR: compile ref: %s\n" ref.ref_name;
