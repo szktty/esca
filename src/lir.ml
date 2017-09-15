@@ -9,19 +9,19 @@ module Register = struct
   type t = {
     id : id;
     ty : Raw_type.t;
-    param : bool;
+    scope : [`Param | `Local];
   }
 
-  let create ~id ~ty ~param = { id; ty; param }
+  let create ~id ~ty ~scope = { id; ty; scope }
 
   let ids regs =
     List.map regs ~f:(fun reg -> reg.id)
 
   let params regs =
-    List.filter regs ~f:(fun reg -> reg.param)
+    List.filter regs ~f:(fun reg -> reg.scope = `Param)
 
   let locals regs =
-    List.filter regs ~f:(fun reg -> not reg.param)
+    List.filter regs ~f:(fun reg -> reg.scope = `Local)
 
 end
 
@@ -318,7 +318,7 @@ module Context = struct
 
   let create src =
     (* dummy *)
-    let r0 = Register.create ~id:"r0" ~ty:Raw_type.Void ~param:false in
+    let r0 = Register.create ~id:"r0" ~ty:Raw_type.Void ~scope:`Local in
     { src;
       ops = [];
       locals = [];
@@ -331,18 +331,18 @@ module Context = struct
   let add_reg ctx reg =
     { ctx with locals = reg :: ctx.locals }
 
-  let new_reg ctx ty ~prefix ~param =
+  let new_reg ctx ty ~prefix ~scope =
     let n = List.length ctx.locals in
     let id = Printf.sprintf "%s%d" prefix n in
-    let reg = Register.create ~id ~ty ~param in
+    let reg = Register.create ~id ~ty ~scope in
     let ctx = add_reg ctx reg in
     { ctx with rc = reg }, reg
 
   let new_param ctx ty =
-    new_reg ctx ty ~prefix:"t" ~param:true
+    new_reg ctx ty ~prefix:"t" ~scope:`Param
 
-  let new_var ctx ty =
-    new_reg ctx ty ~prefix:"t" ~param:false
+  let new_local ctx ty =
+    new_reg ctx ty ~prefix:"t" ~scope:`Local
 
   let set_main ctx reg =
     { ctx with main = Some reg }
@@ -356,7 +356,7 @@ module Context = struct
     { ctx with ops = op :: ctx.ops }
 
   let add_var_op ctx ty ~f =
-    let ctx, reg = new_var ctx ty in
+    let ctx, reg = new_local ctx ty in
     add_op ctx @@ f reg
 
   let move ctx from to_ =
@@ -439,7 +439,7 @@ module Compiler = struct
                               call_args = arg_locals })
 
     | Prim prim ->
-      let ctx, reg = new_var ctx (Raw_type.of_type prim.prim_ty) in
+      let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_ty) in
       add_op ctx @@ Prim {
         prim_rc = reg;
         prim_name = prim.prim_name;
