@@ -284,14 +284,14 @@ module Context = struct
   }
 
   let create src =
+    (* dummy *)
     let r0 = Register.create "r0" Raw_type.Void in
-    let l0 = "L0" in
     { src;
       ops = [];
-      regs = [r0];
+      regs = [];
       rc = r0;
       flag = "fr";
-      labels = [l0];
+      labels = [];
       main = None;
     }
 
