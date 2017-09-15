@@ -249,9 +249,19 @@ module Program = struct
 
   and write_fun buf func =
     let open Buffer in
-    add_string buf "func ";
-    add_string buf func.fdef_name;
-    add_string buf "() ";
+    let spec =
+      match func.fdef_name with
+      | "main" -> `Main
+      | "init" -> `Init
+      | name -> `Generic name
+    in
+    add_string buf @@ sprintf "func %s(" func.fdef_name;
+    add_string buf @@ sprintf ") ";
+    begin match spec with
+      | `Main | `Init -> ()
+      | `Generic _ ->
+        add_string buf @@ (Raw_type.to_string func.fdef_ret)
+    end;
     add_string buf " {\n";
 
     (* flag Register.id *)
