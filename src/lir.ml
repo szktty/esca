@@ -41,7 +41,7 @@ module Op = struct
     | Eq_string of Register.t * string
     | Branch of branch
     | Jump of label
-    | Return of Register.t list
+    | Return of Register.t
     | Label of label
 
     | Call of call
@@ -218,6 +218,9 @@ module Program = struct
     | Eq_string (reg, v) ->
       addln @@ sprintf "%s = %s == %s" flag reg.id (Go.Repr.of_string v)
 
+    | Return reg ->
+      addln @@ sprintf "return %s" reg.id
+
     | Call call ->
       Printf.printf "call\n";
       with_exp buf call.call_rc.id
@@ -353,7 +356,8 @@ module Compiler = struct
     Printf.printf "LIR: compile closure '%s'\n" clos.var.id;
     let open Context in
     let clos_ctx = compile_block ctx clos.block in
-    Printf.printf "ops: %d\n" (List.length clos_ctx.ops);
+    (* return last value *)
+    let clos_ctx = add_op clos_ctx @@ Return clos_ctx.rc in
     let vars = List.rev_map clos_ctx.regs
         ~f:(fun reg -> { Op.var_reg = reg }) in
     let clos_ctx = finish clos_ctx in
