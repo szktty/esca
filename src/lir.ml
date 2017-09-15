@@ -424,11 +424,11 @@ module Compiler = struct
       let ctx = compile_op ctx call.call_fun in
       let fun_reg = ctx.rc in
       Printf.printf "LIR: call fun %s\n" fun_reg.id;
-      let ctx, arg_locals = compile_exps ctx call.call_args in
+      let ctx, arg_regs = compile_exps ctx call.call_args in
       add_var_op ctx (Raw_type.return_ty_exn fun_reg.ty)
         ~f:(fun reg -> Call { call_rc = reg;
                               call_fun = fun_reg;
-                              call_args = arg_locals })
+                              call_args = arg_regs })
 
     | Prim prim ->
       let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_ty) in
