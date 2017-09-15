@@ -67,7 +67,7 @@ module Op = struct
   and context = {
     ctx_src : string;
     ctx_ops : t list;
-    ctx_regs : Register.t list;
+    ctx_locals : Register.t list;
     ctx_flag : Register.id;
   }
 
@@ -309,7 +309,7 @@ module Context = struct
   type t = {
     src : string;
     ops : Op.t list;
-    regs : Register.t list;
+    locals : Register.t list;
     rc : Register.t;
     flag : Register.id;
     labels : label list;
@@ -321,7 +321,7 @@ module Context = struct
     let r0 = Register.create ~id:"r0" ~ty:Raw_type.Void ~param:false in
     { src;
       ops = [];
-      regs = [];
+      locals = [];
       rc = r0;
       flag = "fr";
       labels = [];
@@ -329,10 +329,10 @@ module Context = struct
     }
 
   let add_reg ctx reg =
-    { ctx with regs = reg :: ctx.regs }
+    { ctx with locals = reg :: ctx.locals }
 
   let new_reg ctx ty ~prefix ~param =
-    let n = List.length ctx.regs in
+    let n = List.length ctx.locals in
     let id = Printf.sprintf "%s%d" prefix n in
     let reg = Register.create ~id ~ty ~param in
     let ctx = add_reg ctx reg in
@@ -364,12 +364,12 @@ module Context = struct
 
   let finish ctx =
     { ctx with ops = List.rev ctx.ops;
-               regs = List.rev ctx.regs }
+               locals = List.rev ctx.locals }
 
   let to_clos_ctx ctx : Op.context =
     { ctx_src = ctx.src;
       ctx_ops = ctx.ops;
-      ctx_regs = List.rev ctx.regs;
+      ctx_locals = List.rev ctx.locals;
       ctx_flag = ctx.flag }
 
 end
@@ -399,7 +399,7 @@ module Compiler = struct
     in
 
     let clos_ctx = finish clos_ctx in
-    let vars = List.map (Register.locals clos_ctx.regs)
+    let vars = List.map (Register.locals clos_ctx.locals)
         ~f:(fun reg -> { Op.var_reg = reg }) in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
                  fdef_name = clos.name;
@@ -432,11 +432,11 @@ module Compiler = struct
       let ctx = compile_op ctx call.call_fun in
       let fun_reg = ctx.rc in
       Printf.printf "LIR: call fun %s\n" fun_reg.id;
-      let ctx, arg_regs = compile_exps ctx call.call_args in
+      let ctx, arg_locals = compile_exps ctx call.call_args in
       add_var_op ctx (Raw_type.return_ty_exn fun_reg.ty)
         ~f:(fun reg -> Call { call_rc = reg;
                               call_fun = fun_reg;
-                              call_args = arg_regs })
+                              call_args = arg_locals })
 
     | Prim prim ->
       let ctx, reg = new_var ctx (Raw_type.of_type prim.prim_ty) in
@@ -472,14 +472,14 @@ module Compiler = struct
       ~f:(fun ctx op -> compile_op ctx op)
 
   and compile_exps (ctx:Context.t) (ops:Hir.Op.t list) =
-    let ctx, regs =
+    let ctx, locals =
       List.fold_left ops
         ~init:(ctx, [])
-        ~f:(fun (ctx, regs) op ->
+        ~f:(fun (ctx, locals) op ->
             let ctx = compile_op ctx op in
-            ctx, ctx.rc :: regs)
+            ctx, ctx.rc :: locals)
     in
-    ctx, List.rev regs
+    ctx, List.rev locals
 
   and compile_ptn ctx reg (ptn:Hir.Op.pattern) =
     Printf.printf "LIR: compile pattern\n";
