@@ -21,6 +21,8 @@ module Op = struct
     | Vardef of vardef
     | Assign of assign
     | Switch of switch
+    | If of if_
+    | Return of return option
     | Block of t list
     | Call of call
     | Var of Var.t
@@ -74,6 +76,16 @@ module Op = struct
     | Ptn_list of pattern list
     | Ptn_tuple of pattern list
     | Ptn_var of id
+
+  and if_ = {
+    if_actions : (t * t list) list;
+    if_else : t list;
+  }
+
+  and return = {
+    ret_var : Var.t;
+    ret_val : t;
+  }
 
   and call = {
     call_fun : t;
@@ -286,6 +298,28 @@ module Compiler = struct
         sw_val = val_op;
         sw_clss = cls_ops;
       }
+
+    | `If if_ -> 
+      Printf.printf "HIR: compile if\n";
+      let claus = List.map if_.if_actions
+          ~f:(fun (cond, action) ->
+              let ctx, cond_op = compile_node ctx cond in
+              let act_ops = compile_fold' ctx action in
+              cond_op, act_ops)
+      in
+      let other = compile_fold' ctx if_.if_else in
+      ctx, If { if_actions = claus; if_else = other }
+
+    | `Return exp ->
+      Printf.printf "HIR: compile return\n";
+      let ctx, ret = match exp with
+        | None -> ctx, None
+        | Some exp ->
+          let ctx, var = new_var ctx @@ Ast.type_exn exp in
+          let op = compile_node' ctx exp in
+          ctx, Some { ret_var = var; ret_val = op }
+      in
+      ctx, Return ret
 
     | `Funcall call -> 
       Printf.printf "HIR: compile funcall\n";

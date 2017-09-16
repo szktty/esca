@@ -50,6 +50,7 @@ module Op = struct
     | Jump of label
     | Return of Register.t
     | Void_return
+    | Nothing_return
     | Label of label
 
     | Call of call
@@ -236,7 +237,7 @@ module Program = struct
     | Return reg ->
       addln @@ sprintf "return %s" reg.id
 
-    | Void_return ->
+    | Nothing_return ->
       addln @@ sprintf "return"
 
     | Call call ->
@@ -387,6 +388,16 @@ module Context = struct
       ctx_locals = List.rev ctx.locals;
       ctx_flag = ctx.flag }
 
+  let map ctx elts ~f =
+    let ctx, rev_accu =
+      List.fold_left elts
+        ~init:(ctx, [])
+        ~f:(fun (ctx, accu) elt ->
+            let ctx, elt = f ctx elt in
+            ctx, elt :: accu)
+    in
+    ctx, List.rev rev_accu
+
 end
 
 module Compiler = struct
@@ -412,8 +423,10 @@ module Compiler = struct
     (* return value *)
     let clos_ctx =
       match Op.special_fun clos.var.id with
-      | `Fun _ -> add_op clos_ctx @@ Return clos_ctx.rc
-      | `Main | `Init -> add_op clos_ctx @@ Void_return
+      | `Fun _ ->
+        (* TODO: void return *)
+        add_op clos_ctx @@ Return clos_ctx.rc
+      | `Main | `Init -> add_op clos_ctx @@ Nothing_return
     in
 
     let clos_ctx = finish clos_ctx in
@@ -442,6 +455,38 @@ module Compiler = struct
               Branch { br_cond = false; br_dest = dest } in
             let ctx = compile_block ctx cls.sw_cls_action in
             add_op ctx @@ Label dest)
+
+    | If if_ ->
+      Printf.printf "LIR: compile if\n";
+      let ctx, end_ = new_label ctx in
+
+      (* actions *)
+      let ctx = List.fold if_.if_actions
+          ~init:ctx
+          ~f:(fun ctx (cond, act) ->
+              Printf.printf "LIR: compile if-action\n";
+              let ctx, dest = new_label ctx in
+              let ctx = compile_op ctx cond in
+              let ctx = add_op ctx @@
+                Branch { br_cond = false; br_dest = dest } in
+              let ctx = compile_block ctx act in
+              let ctx = add_op ctx @@ Jump end_ in
+              add_op ctx @@ Label dest)
+      in
+
+      (* else-action *)
+      let ctx = compile_block ctx if_.if_else in
+      add_op ctx @@ Label end_
+
+    | Return ret ->
+      Printf.printf "LIR: compile return\n";
+      begin match ret with
+        | None ->
+          add_op ctx Void_return
+        | Some ret ->
+          let ctx = compile_op ctx ret.ret_val in
+          add_op ctx @@ Return ctx.rc
+      end
 
     | Call call ->
       Printf.printf "LIR: compile call\n";
