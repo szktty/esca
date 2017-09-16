@@ -61,6 +61,7 @@ module Op = struct
     | Ref_var of ref_var
     | Prim of primitive
     | Null
+    | Void of Register.t
     | Bool of bool
     | Int of Register.t * int
     | Float of float
@@ -261,6 +262,9 @@ module Program = struct
 
     | Null -> add "null"
 
+    | Void reg ->
+      with_exp buf reg.id ~f:(fun _ -> add "Void{}")
+
     | Int (reg, value) ->
       with_exp buf reg.id ~f:(fun _ -> add @@ sprintf "%d" value)
 
@@ -423,9 +427,7 @@ module Compiler = struct
     (* return value *)
     let clos_ctx =
       match Op.special_fun clos.var.id with
-      | `Fun _ ->
-        (* TODO: void return *)
-        add_op clos_ctx @@ Return clos_ctx.rc
+      | `Fun _ -> add_op clos_ctx @@ Return clos_ctx.rc
       | `Main | `Init -> add_op clos_ctx @@ Nothing_return
     in
 
