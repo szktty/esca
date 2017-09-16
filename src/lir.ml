@@ -217,6 +217,9 @@ module Program = struct
       addln @@ sprintf "goto %s" br.br_dest;
       addln "}"
 
+    | Jump label ->
+      addln @@ sprintf "goto %s" label
+
     | Label label ->
       addln @@ sprintf "\n%s:" label
 
@@ -291,12 +294,10 @@ module Program = struct
     add_string buf @@ sprintf "%s) " params;
 
     (* return value type *)
+    let ret_ty = Raw_type.return_ty_exn func.fdef_ty in
     begin match spec with
       | `Main | `Init -> ()
-      | `Fun _ ->
-        Raw_type.return_ty_exn func.fdef_ty
-        |> Raw_type.to_string
-        |> add_string buf
+      | `Fun _ -> Raw_type.to_string ret_ty |> add_string buf
     end;
     add_string buf " {\n";
 
@@ -310,7 +311,17 @@ module Program = struct
             var.id (Raw_type.to_string var.ty) var.id);
     add_string buf "\n";
 
+    (* block *)
     write_ops buf func.fdef_body;
+
+    (* return value *)
+    begin match spec with
+      | `Main | `Init -> ()
+      | `Fun _ ->
+        add_string buf @@ Printf.sprintf "return %s\n"
+          (Raw_type.zero ret_ty)
+    end;
+
     add_string buf "}\n\n";
 
 end

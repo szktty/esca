@@ -87,3 +87,13 @@ let return_ty = function
 
 let return_ty_exn ty =
   Option.value_exn (return_ty ty)
+
+let zero = function
+  | Void -> "Void{}"
+  | Bool -> "false"
+  | Uint | Uint8 | Uint16 | Uint32 | Uint64
+  | Int | Int8 | Int16 | Int32 | Int64 -> "0"
+  | Float32 | Float64 -> "0.0"
+  | String -> ""
+  | _ -> "nil"
+
