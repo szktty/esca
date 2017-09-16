@@ -314,12 +314,10 @@ module Program = struct
     (* block *)
     write_ops buf func.fdef_body;
 
-    (* return value *)
+    (* suppress return type error after last label *)
     begin match spec with
       | `Main | `Init -> ()
-      | `Fun _ ->
-        add_string buf @@ Printf.sprintf "return %s\n"
-          (Raw_type.zero ret_ty)
+      | `Fun _ -> add_string buf "panic(\"Unreachable code\")\n"
     end;
 
     add_string buf "}\n\n";
