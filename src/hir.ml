@@ -38,6 +38,7 @@ module Op = struct
 
   and fundef = {
     fdef_var : Var.t; (* TODO: need? *)
+    fdef_ty : Type.t;
     fdef_name : string;
     fdef_params : Var.t list;
     fdef_block : t list;
@@ -109,19 +110,20 @@ module Closure = struct
 
   type t = {
     parent : t option;
+    ty : Type.t;
     var : Var.t;
     name : string;
     params : Var.t list;
     block : Op.t list;
-    (* ret : Type.t; *)
   }
 
-  let create ~parent ~var ~name ~params ~block =
-    { parent; var; name; params; block }
+  let create ~parent ~ty ~var ~name ~params ~block =
+    { parent; ty; var; name; params; block }
 
   let of_fundef (def:Op.fundef) =
     create
       ~parent:None
+      ~ty:def.fdef_ty
       ~var:def.fdef_var
       ~name:def.fdef_name
       ~params:def.fdef_params
@@ -262,6 +264,7 @@ module Compiler = struct
       let ctx' = add_var ctx fun_var in
       ctx', Fundef {
         fdef_var = fun_var;
+        fdef_ty = Option.value_exn def.fdef_type;
         fdef_name = def.fdef_name.desc;
         fdef_params = params;
         fdef_block = block;

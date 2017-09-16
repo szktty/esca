@@ -87,10 +87,10 @@ module Op = struct
   and fundef = {
     fdef_ctx : context;
     fdef_name : string;
+    fdef_ty : Raw_type.t;
     fdef_params : Register.t list;
     fdef_locals : Register.t list;
     fdef_body : t list;
-    fdef_ret : Raw_type.t;
   }
 
   and ref_fun = {
@@ -293,7 +293,10 @@ module Program = struct
     (* return value type *)
     begin match spec with
       | `Main | `Init -> ()
-      | `Fun _ -> add_string buf @@ (Raw_type.to_string func.fdef_ret)
+      | `Fun _ ->
+        Raw_type.return_ty_exn func.fdef_ty
+        |> Raw_type.to_string
+        |> add_string buf
     end;
     add_string buf " {\n";
 
@@ -427,17 +430,17 @@ module Compiler = struct
     (* return value *)
     let clos_ctx =
       match Op.special_fun clos.var.id with
-      | `Fun _ -> add_op clos_ctx @@ Return clos_ctx.rc
+      | `Fun _ -> clos_ctx (*add_op clos_ctx @@ Return clos_ctx.rc*)
       | `Main | `Init -> add_op clos_ctx @@ Nothing_return
     in
 
     let clos_ctx = finish clos_ctx in
     let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
+                 fdef_ty = Raw_type.of_type clos.ty;
                  fdef_name = clos.name;
                  fdef_params = params;
                  fdef_locals = Register.locals clos_ctx.locals;
-                 fdef_body = clos_ctx.ops;
-                 fdef_ret = Raw_type.Void } in
+                 fdef_body = clos_ctx.ops } in
     ctx, fdef
 
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : Context.t =
