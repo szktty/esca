@@ -1,3 +1,3 @@
-val debugf : ('a, out_channel, unit) format -> 'a
+val debug : ('a, out_channel, unit) format -> 'a
 
-val verbosef : ('a, out_channel, unit) format -> 'a
+val verbose : ('a, out_channel, unit) format -> 'a

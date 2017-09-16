@@ -508,6 +508,6 @@ and infer_ptn env (ptn:Ast.pattern) =
   | _ -> failwith "notimpl"
 
 let run (e:Ast.t) =
-  verbosef "begin typing";
+  verbose "begin typing";
   ignore @@ infer (Context.value_env ()) e;
-  verbosef "end typing"
+  verbose "end typing"

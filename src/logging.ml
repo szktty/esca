@@ -1,12 +1,12 @@
 open Core.Std
 
-let debugf f =
+let debug f =
   if !Config.debug_mode then
     printf ("# " ^^ f ^^ "\n")
   else
     Printf.ifprintf stderr f
 
-let verbosef f =
+let verbose f =
   if !Config.verbose_mode || !Config.debug_mode then
     printf ("# " ^^ f ^^ "\n")
   else
