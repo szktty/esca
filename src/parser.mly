@@ -295,25 +295,25 @@ if_stat:
           if_else = [];
           if_type = None }
   }
-  | IF exp LBRACE block elseif_block RBRACE
+  | IF exp LBRACE block RBRACE elseif_block
   {
       `If {
-          if_actions = ($2, $4) :: $5;
+          if_actions = ($2, $4) :: $6;
           if_else = [];
           if_type = None }
   }
-  | IF exp LBRACE block ELSE block RBRACE
+  | IF exp LBRACE block RBRACE ELSE LBRACE block RBRACE
   {
       `If {
           if_actions = [($2, $4)];
-          if_else = $6;
+          if_else = $8;
           if_type = None }
   }
-  | IF exp LBRACE block elseif_block ELSE block RBRACE
+  | IF exp LBRACE block RBRACE elseif_block ELSE LBRACE block RBRACE
   {
       `If {
-          if_actions = ($2, $4) :: $5;
-          if_else = $7;
+          if_actions = ($2, $4) :: $6;
+          if_else = $9;
           if_type = None }
   }
 
