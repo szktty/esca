@@ -180,8 +180,8 @@ stat:
   | funcall %prec app { $1 }
 
 last_stat:
-  | RETURN { `Return [] }
-  | RETURN exp_list { `Return $2 }
+  | RETURN { `Return None }
+  | RETURN exp { `Return (Some $2) }
 
 exp:
   | fun_exp { $1 }

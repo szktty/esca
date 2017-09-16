@@ -204,13 +204,10 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
         in
         (env, desc_unit)
 
-      | `Return es ->
-        begin match es with
-          | [] -> env, unit.desc
-          | e :: [] ->
-            env, (easy_infer env e).desc
-          | es ->
-            env, desc_tuple @@ List.map es ~f:(easy_infer env)
+      | `Return e ->
+        begin match e with
+          | None -> env, unit.desc
+          | Some e -> env, (easy_infer env e).desc
         end
 
       | `If if_ -> 

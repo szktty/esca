@@ -55,7 +55,7 @@ type t = [
   | `Assign of assign
   | `Fundef of fundef
   | `Strdef of strdef
-  | `Return of t list
+  | `Return of t option
   | `If of if_
   | `For of for_
   | `Switch of switch

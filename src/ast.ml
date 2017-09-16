@@ -112,9 +112,9 @@ let rec write chan (node:Ast_intf.t) =
           output_rp ());
     output_string "]";
     output_rp ()
-  | `Return exps ->
+  | `Return exp ->
     output_string "(return ";
-    write_nodes exps;
+    Option.iter exp ~f:write;
     output_rp ()
   | `If if_ ->
     output_string "(if [";
