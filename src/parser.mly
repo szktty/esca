@@ -470,7 +470,7 @@ var_name:
   | IDENT Q { create $1.loc ($1.desc ^ "?") }
 
 literal:
-  | LPAREN RPAREN { `Unit $1 }
+  | LPAREN RPAREN { `Void $1 }
   | STRING { `String $1 }
   | INT { `Int $1 }
   | FLOAT { `Float $1 }
@@ -519,7 +519,7 @@ pattern:
   | pattern_clause { { ptn_cls = $1; ptn_type = None } }
 
 pattern_clause:
-  | LPAREN RPAREN { `Unit $1 }
+  | LPAREN RPAREN { `Void $1 }
   | STRING { `String $1 }
   | INT { `Int $1 }
   | FLOAT { `Float $1 }

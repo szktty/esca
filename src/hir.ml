@@ -164,7 +164,7 @@ module Context = struct
       id = 0;
       vars = [];
       var_map = String.Map.empty;
-      ret = Type.unit;
+      ret = Type.void;
       prog = None;
     }
 
@@ -201,7 +201,7 @@ module Context = struct
     String.Map.find ctx.var_map name
 
   (* TODO: type *)
-  let main_fun = { Var.id = "main"; ty = Type.unit }
+  let main_fun = { Var.id = "main"; ty = Type.void }
 
 end
 
@@ -333,7 +333,7 @@ module Compiler = struct
       in
       ctx, Call { call_fun = fun_op;
                   call_args = arg_ops;
-                  call_ty = Type.unit }
+                  call_ty = Type.void }
 
     | `Var var ->
       let name = var.var_name.desc in
@@ -387,7 +387,7 @@ module Compiler = struct
 
     match ptn.ptn_cls with
     | `Nop _ -> ctx, Ptn_nop
-    | `Unit _ -> ctx, Ptn_void
+    | `Void _ -> ctx, Ptn_void
     | `Bool v -> ctx, Ptn_bool v.desc
     | `Int v -> ctx, Ptn_int v.desc
     | `String v -> ctx, Ptn_string v.desc

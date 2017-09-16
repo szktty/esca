@@ -2,7 +2,7 @@ open Core.Std
 
 let init () =
   Context.Spec.(define "Kernel" ~init:true
-                +> typ "Unit" Type.unit
+                +> typ "Void" Type.void
                 +> typ "Bool" Type.bool
                 +> typ "Int" Type.int
                 +> typ "Float" Type.float
@@ -13,7 +13,7 @@ let init () =
                 +> typ "Box" Type.box_gen
                 +> typ "Stream" Type.stream
                 +> fun_ "id" Type.Spec.(a @-> a)
-                +> fun_ "print" Type.Spec.(string @-> unit)
+                +> fun_ "print" Type.Spec.(string @-> void)
                 +> fun_ "printf" Type.Spec.fun_printf
                 +> string "version"
                 |> end_);

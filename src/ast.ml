@@ -181,7 +181,7 @@ let rec write chan (node:Ast_intf.t) =
     output_space ();
     write idx.idx_index;
     output_rp ()
-  | `Unit _ -> output_string "()"
+  | `Void _ -> output_string "()"
   | `Bool { desc = true } -> output_string "true"
   | `Bool { desc = false } -> output_string "false"
   | `Int v -> output_string @@ sprintf "%d" v.desc
@@ -224,7 +224,7 @@ and write_ptn chan ptn =
   let write_ptns es = write_list chan es ~f:write in
   let write_texts es = write_list chan es ~f:(fun e -> output_string e.desc) in
   match ptn.ptn_cls with
-  | `Unit _ -> output_string "()"
+  | `Void _ -> output_string "()"
   | `Bool { desc = true } -> output_string "true"
   | `Bool { desc = false } -> output_string "false"
   | `Int v -> output_string @@ sprintf "%d" v.desc

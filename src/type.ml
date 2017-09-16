@@ -10,7 +10,7 @@ and desc = [
 ]
 
 and tycon = [
-  | `Unit
+  | `Void
   | `Bool
   | `Int
   | `Float
@@ -61,7 +61,7 @@ let rec to_string (ty:t) =
   match ty.desc with
   | `App (tycon, args) ->
     let tycon_s = match tycon with
-      | `Unit -> "Unit"
+      | `Void -> "Void"
       | `Bool -> "Bool"
       | `Int -> "Int"
       | `Float -> "Float"
@@ -132,7 +132,7 @@ let tyvar_d = tyvar "d"
 let poly tyvars ty = `Poly (tyvars, ty)
 
 let app ?(args=[]) tycon = `App (tycon, args)
-let desc_unit = app `Unit
+let desc_void = app `Void
 let desc_bool = app `Bool
 let desc_int = app `Int
 let desc_float = app `Float
@@ -148,7 +148,7 @@ let desc_fun_printf = app `Fun_printf
 let desc_stream = app `Stream
 let desc_prim name ty = app (`Prim { prim_name = name; prim_type = ty })
 
-let unit = Located.less desc_unit
+let void = Located.less desc_void
 let bool = Located.less desc_bool
 let int = Located.less desc_int
 let float = Located.less desc_float
@@ -190,7 +190,7 @@ module Spec = struct
 
   type t = [
     | `Tyvar of string
-    | `Unit
+    | `Void
     | `Bool
     | `Int
     | `Float
@@ -205,7 +205,7 @@ module Spec = struct
     | `Stream
   ]
 
-  let unit = `Unit
+  let void = `Void
   let bool = `Bool
   let int = `Int
   let float = `Float
@@ -244,7 +244,7 @@ module Spec = struct
   let collect_tyvars (spec:t) =
     let rec f (tyvars:string list) spec =
       match spec with
-      | `Unit -> tyvars, desc_unit
+      | `Void -> tyvars, desc_void
       | `Bool -> tyvars, desc_bool
       | `Int -> tyvars, desc_int
       | `Float -> tyvars, desc_float

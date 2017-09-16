@@ -27,7 +27,7 @@ let rec of_type (ty:Type.t) : t =
       | None -> failwith "must not be none"
       | Some ty -> of_type ty
     end
-  | `App (`Unit, []) -> Void
+  | `App (`Void, []) -> Void
   | `App (`Bool, []) -> Bool
   | `App (`Int, []) -> Int
   | `App (`Float, []) -> Float32

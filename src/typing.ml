@@ -106,7 +106,7 @@ let rec occur (ref:t option ref) (ty:Type.t) : bool =
   match ty.desc with
   | `App (tycon, args) ->
     begin match tycon with
-      | `Unit
+      | `Void
       | `Bool
       | `Int
       | `Float
@@ -134,7 +134,7 @@ let rec occur (ref:t option ref) (ty:Type.t) : bool =
 let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   Printf.printf "unify %s and %s\n" (Type.to_string ex) (Type.to_string ac);
   match ex.desc, ac.desc with
-  | `App (`Unit, []), `App (`Unit, [])
+  | `App (`Void, []), `App (`Void, [])
   | `App (`Bool, []), `App (`Bool, [])
   | `App (`Int, []), `App (`Int, [])
   | `App (`Float, []), `App (`Float, [])
@@ -195,18 +195,18 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
   let loc = Ast.location e in
   try
     let env, desc = match e with
-      | `Nop _ -> (env, desc_unit)
+      | `Nop _ -> (env, desc_void)
 
       | `Chunk chunk -> 
         let env = List.fold_left chunk.ch_stats
             ~init:env
             ~f:(fun env e -> fst @@ infer env e)
         in
-        (env, desc_unit)
+        (env, desc_void)
 
       | `Return e ->
         begin match e with
-          | None -> env, unit.desc
+          | None -> env, void.desc
           | Some e -> env, (easy_infer env e).desc
         end
 
@@ -216,7 +216,7 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
         let unify_block block =
           List.iteri block ~f:(fun i exp ->
               let ex =
-                if i < List.length block - 1 then Type.unit else value
+                if i < List.length block - 1 then Type.void else value
               in
               unify ~ex ~ac:(easy_infer env exp))
         in
@@ -233,10 +233,10 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
         unify ~ex:Type.range ~ac:(easy_infer env for_.for_range);
         let env = Env.add env ~key:for_.for_var.desc ~data:Type.int in
         let _, block_ty = infer_block env for_.for_block in
-        unify ~ex:Type.unit ~ac:block_ty;
-        (env, Type.unit.desc)
+        unify ~ex:Type.void ~ac:block_ty;
+        (env, Type.void.desc)
 
-      | `Unit _ -> (env, desc_unit)
+      | `Void _ -> (env, desc_void)
       | `Bool _ -> (env, desc_bool)
       | `Int _ -> (env, desc_int)
       | `Float _ -> (env, desc_float)
@@ -299,9 +299,9 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
                 List.iter2_exn params args
                   ~f:(fun param arg -> unify ~ex:param ~ac:arg);
                 Printf.printf "# printf ok\n";
-                (env, Type.desc_unit)
+                (env, Type.desc_void)
               end
-            | _ -> (env, Type.desc_unit)
+            | _ -> (env, Type.desc_void)
 
         end else begin
           let args = List.map call.fc_args ~f:(fun e -> easy_infer env e) in
@@ -428,7 +428,7 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
       let t = infer env e3 in
       unify (`Array(t)) (infer env e1);
       unify `Int (infer env e2);
-      `Unit
+      `Void
        *)
       | _ -> Ast.print e; failwith "TODO"
     in
@@ -448,7 +448,7 @@ let rec infer env (e:Ast.t) : (Type.t Env.t * Type.t) =
 and easy_infer env (e:Ast.t) : Type.t = snd @@ infer env e
 
 and infer_block env es =
-  List.fold_left es ~init:(env, Type.unit)
+  List.fold_left es ~init:(env, Type.void)
     ~f:(fun (env, _) e -> infer env e)
 
 and infer_sw_cls env match_ty val_ty (cls:Ast.switch_cls) =
@@ -472,7 +472,7 @@ and infer_sw_cls env match_ty val_ty (cls:Ast.switch_cls) =
 
 and infer_ptn env (ptn:Ast.pattern) =
   match ptn.ptn_cls with
-  | `Nop _ | `Unit _ -> (env, Type.unit)
+  | `Nop _ | `Void _ -> (env, Type.void)
   | `Bool _ -> (env, Type.bool)
   | `Int _ -> (env, Type.int)
   | `Float _ -> (env, Type.float)

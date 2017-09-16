@@ -67,7 +67,7 @@ type t = [
   | `Directive of (text * t list)
   | `Var of var
   | `Index of index
-  | `Unit of Location.t
+  | `Void of Location.t
   | `Bool of bool Located.t
   | `String of string Located.t
   | `Int of int Located.t
@@ -198,7 +198,7 @@ and pattern = {
 
 and ptn_cls = [
   | `Nop of Location.t (* internal use *)
-  | `Unit of Location.t
+  | `Void of Location.t
   | `Bool of bool Located.t
   | `String of string Located.t
   | `Int of int Located.t
