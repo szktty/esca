@@ -1,7 +1,7 @@
 open Core.Std
 
 let init () =
-  Context.Spec.(define "Kernel" ~init:true
+  Library.Spec.(define "Kernel" ~init:true
                 +> typ "Void" Type.void
                 +> typ "Bool" Type.bool
                 +> typ "Int" Type.int

@@ -374,7 +374,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
           | Some prefix ->
             begin match (Type.unwrap (easy_infer clos env prefix)).desc with
               | `App (`Module mname, _) ->
-                begin match Context.find_type_module mname with
+                begin match Library.find_type_module mname with
                   | None -> failwith (sprintf "unknown module %s" mname)
                   | Some m ->
                     let aname = var.var_name.desc in
@@ -556,5 +556,5 @@ and infer_ptn clos env (ptn:Ast.pattern) =
 
 let run (e:Ast.t) =
   verbose "begin typing";
-  ignore @@ infer (Closure.create ()) (Context.value_env ()) e;
+  ignore @@ infer (Closure.create ()) (Library.value_env ()) e;
   verbose "end typing"

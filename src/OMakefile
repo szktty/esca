@@ -157,11 +157,11 @@ FILES[] =
 	ast
 	ast_intf
 	config
-	context
 	env
 	go
 	hir
 	lexer
+	library
 	lir
 	located
 	location
