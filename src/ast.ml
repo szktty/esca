@@ -76,6 +76,10 @@ let rec write chan (node:Ast_intf.t) =
     output_space ();
     write_texts fdef.fdef_params;
     output_space ();
+    Option.iter fdef.fdef_ret
+      ~f:(fun ty ->
+          write_tyexp chan ty;
+          output_space ());
     write_nodes fdef.fdef_block;
     output_string ")"
   | `Strdef sdef ->
@@ -275,6 +279,10 @@ and write_tyexp chan tyexp =
 
 let print node =
   write Out_channel.stdout node;
+  Printf.printf "\n"
+
+let print_tyexp node =
+  write_tyexp Out_channel.stdout node;
   Printf.printf "\n"
 
 let type_ (node:t) =

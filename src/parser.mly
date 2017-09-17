@@ -253,21 +253,23 @@ rev_variant_param_list:
   { `Vardef { vdef_pub = true; vdef_ptn = $3; vdef_exp = $5 } }
 
 fundef:
-  | FUNC var_name param_list EQ exp
-  {
-    `Fundef {
-        fdef_name = $2;
-        fdef_params = $3;
-        fdef_block = [$5];
-        fdef_type = None;
-    }
-  }
   | FUNC var_name param_list LBRACE block RBRACE
   {
     `Fundef {
         fdef_name = $2;
         fdef_params = $3;
+        fdef_ret = None;
         fdef_block = $5;
+        fdef_type = None;
+    }
+  }
+  | FUNC var_name param_list RARROW type_exp LBRACE block RBRACE
+  {
+    `Fundef {
+        fdef_name = $2;
+        fdef_params = $3;
+        fdef_ret = Some $5;
+        fdef_block = $7;
         fdef_type = None;
     }
   }

@@ -37,6 +37,30 @@ module Closure = struct
 
 end
 
+module Tyexp = struct
+
+        (*
+and tyexp_desc =
+  | Ty_var of text
+  | Ty_namepath of text Namepath.t
+  | Ty_app of tyexp * tyexp list
+  | Ty_list of tyexp
+  | Ty_tuple of tyexp list
+  | Ty_option of tyexp
+         *)
+
+  let find_type env (path:Ast.text Namepath.t) =
+    (* TODO: prefix *)
+    Env.find env path.name.desc
+
+  let to_type (env:Type.t Env.t) (node:Ast.tyexp) : Type.t option =
+    Env.debug env ~f:(fun ty -> Type.to_string ty);
+    match node.desc with
+    | Ty_namepath path -> find_type env path
+    | _ -> Some Type.void
+
+end
+
 let rec generalize (ty:Type.t) : Type.t =
   let tyvars : (metavar * tyvar) list ref = ref [] in
 
@@ -279,8 +303,15 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
         in
 
         (* TODO: return type declaration *)
-        (*let ret = Type.create_metavar loc in*)
-        let ret = Type.void in
+        let ret = match fdef.fdef_ret with
+          | None -> Type.void
+          | Some exp ->
+            Printf.printf "find type: ";
+            Ast.print_tyexp exp;
+            match Tyexp.to_type env exp with
+            | None -> failwith "type not found"
+            | Some ty -> ty
+        in
         let clos' = Closure.create () in
         clos'.ret_ty <- Some ret;
 

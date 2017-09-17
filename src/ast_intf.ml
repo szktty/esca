@@ -104,6 +104,7 @@ and vardef = {
 and fundef = {
   fdef_name : text;
   fdef_params : text list;
+  fdef_ret : tyexp option;
   fdef_block : t list;
   mutable fdef_type : Type.t option;
 }
