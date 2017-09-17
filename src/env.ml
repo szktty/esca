@@ -40,6 +40,12 @@ let merge env src =
 let debug env ~f =
   let open Printf in
   printf "{\n";
+  printf "    imports = {\n";
+  List.iter env.imports ~f:(fun m ->
+      printf "        %s\n" (Module.name m));
+  printf "    }\n";
+  printf "    attrs = {\n";
   String.Map.iteri env.attrs ~f:(fun ~key ~data ->
-      printf "  %s = %s\n" key (f data));
+      printf "        %s = %s\n" key (f data));
+  printf "    }\n";
   printf "}\n"
