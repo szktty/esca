@@ -1,21 +1,19 @@
-open Core.Std
-
-type 'a t
+type t
 
 val create :
-  ?imports:'a Module.t list
-  -> ?attrs:'a String.Map.t
+  ?imports:Module.t list
+  -> ?attrs:Module.attr_map
   -> unit
-  ->'a t
+  ->t
 
-val find : 'a t -> string -> 'a option
+val find : t -> string -> Module.attr option
 
-val import : 'a t -> 'a Module.t -> 'a t
+val import : t -> Module.t -> t
 
-val add : 'a t -> key:string -> data:'a ->'a t
+val add : t -> key:string -> data:Module.attr -> t
 
-val merge : 'a t -> 'a String.Map.t ->'a t
+val merge : t -> Module.attr_map -> t
 
-val concat : 'a t -> 'a String.Map.t
+val concat : t -> Module.attr_map
 
-val debug : 'a t -> f:('a -> string) -> unit
+val debug : t -> unit

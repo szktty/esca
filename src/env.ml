@@ -1,8 +1,8 @@
-open Core.Std
+open Core
 
-type 'a t = {
-  imports : 'a Module.t list;
-  attrs : 'a String.Map.t;
+type t = {
+  imports : Module.t list;
+  attrs : Module.attr_map;
 }
 
 let create ?(imports=[]) ?attrs () =
@@ -37,7 +37,7 @@ let merge env src =
                      | `Both (_, v2) -> Some v2)
   }
 
-let debug env ~f =
+let debug env =
   let open Printf in
   printf "{\n";
   printf "    imports = {\n";
@@ -46,6 +46,6 @@ let debug env ~f =
   printf "    }\n";
   printf "    attrs = {\n";
   String.Map.iteri env.attrs ~f:(fun ~key ~data ->
-      printf "        %s = %s\n" key (f data));
+      printf "        %s = %s\n" key (Type.to_string data.attr_type));
   printf "    }\n";
   printf "}\n"

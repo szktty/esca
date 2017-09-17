@@ -49,12 +49,16 @@ and tyexp_desc =
   | Ty_option of tyexp
          *)
 
+  (* TODO: attr kind *)
   let find_type env (path:Ast.text Namepath.t) =
     (* TODO: prefix *)
-    Env.find env path.name.desc
+    match Env.find env path.name.desc with
+    | None -> None
+    | Some attr -> match attr.attr_kind with
+      | `Type -> Some attr.attr_type
+      | _ -> failwith "not type"
 
-  let to_type (env:Type.t Env.t) (node:Ast.tyexp) : Type.t option =
-    Env.debug env ~f:(fun ty -> Type.to_string ty);
+  let to_type (env:Env.t) (node:Ast.tyexp) : Type.t option =
     match node.desc with
     | Ty_namepath path -> find_type env path
     | _ -> Some Type.void
@@ -224,7 +228,7 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
     raise (Unify_error { uniexn_ex = ex; uniexn_ac = ac })
 
 (* 型推論ルーチン (caml2html: typing_g) *)
-let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
+let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
   Printf.printf "infer e: ";
   Ast.print e;
   let loc = Ast.location e in
@@ -266,7 +270,9 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
       | `For for_ ->
         let range_ty = easy_infer clos env for_.for_range in
         unify ~ex:Type.range ~ac:(easy_infer clos env for_.for_range);
-        let env = Env.add env ~key:for_.for_var.desc ~data:Type.int in
+        let env = Env.add env
+            ~key:for_.for_var.desc
+            ~data:(Module.value_attr Type.int) in
         let _, block_ty = infer_block clos env for_.for_block in
         unify ~ex:Type.void ~ac:block_ty;
         (env, Type.void.desc)
@@ -318,9 +324,13 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
         let fun_ty = Type.fun_ (Some loc) params ret in
         fdef.fdef_type <- Some fun_ty;
         (* for recursive call *)
-        let env = Env.add env ~key:fdef.fdef_name.desc ~data:fun_ty in
+        let env = Env.add env
+            ~key:fdef.fdef_name.desc
+            ~data:(Module.value_attr fun_ty) in
         let fenv = List.fold2_exn fdef.fdef_params params ~init:env
-            ~f:(fun env name ty -> Env.add env ~key:name.desc ~data:ty)
+            ~f:(fun env name ty -> Env.add env
+                   ~key:name.desc
+                   ~data:(Module.value_attr ty))
         in
         let _, ret' = infer_block clos' fenv fdef.fdef_block in
         (*unify ~ex:ret ~ac:ret';*)
@@ -374,13 +384,13 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
           | Some prefix ->
             begin match (Type.unwrap (easy_infer clos env prefix)).desc with
               | `App (`Module mname, _) ->
-                begin match Library.find_type_module mname with
+                begin match Library.find_module mname with
                   | None -> failwith (sprintf "unknown module %s" mname)
                   | Some m ->
                     let aname = var.var_name.desc in
                     match Module.find_attr m aname with
                     | None -> failwith ("module attribute is not found: " ^ aname)
-                    | Some ty -> ty
+                    | Some attr -> attr.attr_type
                 end
               | _ -> failwith "not module"
             end
@@ -388,7 +398,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Type.t Env.t * Type.t) =
             let name = var.var_name.desc in
             match Env.find env name with
             | None -> failwith ("variable is not found: " ^ name)
-            | Some ty -> ty
+            | Some attr -> attr.attr_type
         in
         var.var_type <- Some ty;
         env, ty.desc
@@ -513,7 +523,9 @@ and infer_sw_cls clos env match_ty val_ty (cls:Ast.switch_cls) =
   (* var *)
   let env = Option.value_map cls.sw_cls_var
       ~default:env
-      ~f:(fun name -> Env.add env ~key:name.desc ~data:match_ty)
+      ~f:(fun name -> Env.add env
+             ~key:name.desc
+             ~data:(Module.value_attr match_ty))
   in
 
   (* action *)
@@ -530,7 +542,7 @@ and infer_ptn clos env (ptn:Ast.pattern) =
 
   | `Var name ->
     let ty = Type.create_metavar_opt name.loc in
-    (Env.add env ~key:name.desc ~data:ty, ty)
+    (Env.add env ~key:name.desc ~data:(Module.value_attr ty), ty)
 
   | `List elts ->
     let ty = Type.create_metavar @@ Ast.location ptn.ptn_cls in
@@ -556,5 +568,5 @@ and infer_ptn clos env (ptn:Ast.pattern) =
 
 let run (e:Ast.t) =
   verbose "begin typing";
-  ignore @@ infer (Closure.create ()) (Library.value_env ()) e;
+  ignore @@ infer (Closure.create ()) (Library.root_env ()) e;
   verbose "end typing"

@@ -1,32 +1,48 @@
 open Core.Std
 
-type 'a t
+type t
+
+type attr_kind = [`Type | `Value]
+
+type attr = {
+  attr_kind : attr_kind;
+  attr_type : Type.t;
+}
+
+type attr_map = attr String.Map.t
 
 val create :
-  ?parent:'a t
-  -> ?submodules:'a t list
-  -> ?imports:'a t list
-  -> ?attrs:'a String.Map.t
+  ?parent:t
+  -> ?submodules:t list
+  -> ?imports:t list
+  -> ?attrs:attr_map
   -> string
-  -> 'a t
+  -> t
 
-val name : 'a t -> string
+val name : t -> string
 
-val root : 'a t -> 'a t option
+val root : t -> t option
 
-val is_root : 'a t -> bool
+val is_root : t -> bool
 
-val parent : 'a t -> 'a t option
+val parent : t -> t option
 
-val import : 'a t -> 'a t -> unit
+val import : t -> t -> unit
 
-val namepath : 'a t -> string Namepath.t
+val namepath : t -> string Namepath.t
 
-val find_module : ?prefix:string list -> 'a t -> name:string -> 'a t option
+val find_module : ?prefix:string list -> t -> name:string -> t option
 
-val add_module : 'a t -> 'a t -> unit
+val add_module : t -> t -> unit
 
-val find_attr : 'a t -> string -> 'a option
+val attrs : t -> attr_map
 
-val add_attr : 'a t -> key:string -> data:'a -> unit
+val find_attr : t -> string -> attr option
 
+val add_attr : t -> key:string -> data:attr -> unit
+
+val attr : attr_kind -> Type.t -> attr
+
+val type_attr : Type.t -> attr
+
+val value_attr : Type.t -> attr
