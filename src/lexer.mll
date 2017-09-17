@@ -28,11 +28,11 @@ let to_loc lexbuf =
   Location.create (start_pos lexbuf) (end_pos lexbuf)
 
 let to_word lexbuf =
-  Located.locate (to_loc lexbuf) (String.lowercase @@ lexeme lexbuf)
+  Located.locate (to_loc lexbuf) (lexeme lexbuf)
 
 let to_word_map lexbuf ~f =
   let value = f @@ lexeme lexbuf in
-  Located.locate (to_loc lexbuf) (f @@ String.lowercase @@ lexeme lexbuf)
+  Located.locate (to_loc lexbuf) (f @@ lexeme lexbuf)
 
 let strlit lexbuf read =
   let sp = start_pos lexbuf in
