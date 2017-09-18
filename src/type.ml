@@ -7,6 +7,7 @@ and desc = [
   | `Var of tyvar
   | `Poly of tyvar list * t
   | `Prim of primitive
+  | `Partial of t * t list (* type * args *)
   | `Meta of metavar
 ]
 
@@ -91,6 +92,12 @@ let rec to_string (ty:t) =
   | `Prim prim ->
     Printf.sprintf "Prim(\"%s.%s\", %s)"
       prim.prim_pkg prim.prim_id (to_string prim.prim_type)
+  | `Partial (ty, args) ->
+    let args_s =
+      List.map args ~f:to_string
+      |> String.concat ~sep:", "
+    in
+    Printf.sprintf "Partial(%s, [%s])" (to_string ty) args_s
 
 let rec unwrap (ty:t) =
   match ty.desc with
