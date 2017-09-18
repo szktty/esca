@@ -100,8 +100,8 @@ module Op = struct
   }
 
   and primitive = {
-    prim_name : string;
-    prim_ty : Type.t;
+    prim_id : string;
+    prim_type : Type.t;
   }
 
 end
@@ -339,9 +339,9 @@ module Compiler = struct
       let name = var.var_name.desc in
       Printf.printf "HIR: compile var '%s'\n" name;
       let ty = Type.unwrap @@ Option.value_exn var.var_type in
-      begin match Type.prim_name ty with
-        | Some name ->
-          ctx, Prim { prim_name = name; prim_ty = ty }
+      begin match Type.prim_id ty with
+        | Some id ->
+          ctx, Prim { prim_id = id; prim_type = ty }
         | None ->
           (* TODO: namepath *)
           match get_var ctx name with

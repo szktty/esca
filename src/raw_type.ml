@@ -41,7 +41,7 @@ let rec of_type (ty:Type.t) : t =
         collect args (of_type arg :: accu)
     in
     collect args []
-  | `App (`Prim prim, []) -> of_type prim.prim_type
+  | `Prim { prim_type } -> of_type prim_type
   | _ -> Printf.printf "type = %s\n" (Type.to_string ty);
     failwith "of_type: not supported"
 

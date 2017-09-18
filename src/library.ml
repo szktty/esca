@@ -55,7 +55,8 @@ module Spec = struct
     name, { Module.attr_kind = `Type; attr_type = ty }
 
   let value name ty = 
-    name, { Module.attr_kind = `Value; attr_type = Type.prim name ty }
+    name, { Module.attr_kind = `Value;
+            attr_type = Type.prim "dummy" name ty } (* TODO: pkg, id *)
 
   let int name =
     value name Type.int

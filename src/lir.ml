@@ -111,7 +111,7 @@ module Op = struct
 
   and primitive = {
     prim_rc : Register.t;
-    prim_name : string;
+    prim_id : string;
   }
 
   let special_fun = function
@@ -144,7 +144,7 @@ module Program = struct
 
   let bridge_prim_prefix = "EscaPrim"
 
-  let bridge_prim_name name =
+  let bridge_prim_id name =
     bridge_prim_prefix ^ (Utils.camel_case name)
 
   let flag = "fr"
@@ -254,7 +254,7 @@ module Program = struct
             add ")")
 
     | Prim prim ->
-      let bridge = bridge_prim_name prim.prim_name in
+      let bridge = bridge_prim_id prim.prim_id in
       with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
 
     | Ref_fun ref ->
@@ -514,10 +514,10 @@ module Compiler = struct
                               call_args = arg_regs })
 
     | Prim prim ->
-      let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_ty) in
+      let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_type) in
       add_op ctx @@ Prim {
         prim_rc = reg;
-        prim_name = prim.prim_name;
+        prim_id = prim.prim_id;
       }
 
     | Var var ->

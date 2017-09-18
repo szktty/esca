@@ -92,6 +92,8 @@ let rec generalize (ty:Type.t) : Type.t =
         `Var tyvar
       | `Meta ({ contents = Some ty }) -> (walk ty).desc
       | `Poly (tyvars, ty) -> `Poly (tyvars, walk ty)
+      | `Prim prim ->
+        `Prim { prim with prim_type = walk prim.prim_type }
     in
     Located.create ty.loc gen
   in
@@ -108,14 +110,17 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
   match ty.desc with
   | `Var tyvar ->
     Option.value (List.Assoc.find env ~equal:(=) tyvar) ~default:ty
+
   | `App (`Tyfun (tyvars, ty'), args) ->
     let env' = List.map2_exn tyvars args
         ~f:(fun tyvar ty -> (tyvar, ty)) in
     subst (subst ty' env') env
+
   | `App (tycon, args) ->
     let args' = List.map args
         ~f:(fun ty' -> subst ty' env) in
     Located.create ty.loc @@ `App (tycon, args')
+
   | `Poly (tyvars, ty') ->
     let tyvars' = List.mapi tyvars
         ~f:(fun i _tyvar ->
@@ -126,10 +131,16 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
             (tyvar, Located.create ty.loc @@ `Var tyvar'))
     in
     Located.create ty.loc @@ `Poly (tyvars', subst ty'' env)
+
+  | `Prim prim ->
+    Located.create ty.loc @@
+    `Prim { prim with prim_type = subst prim.prim_type env }
+
   | `Meta { contents = Some ty' } ->
     Option.value_map (List.find env ~f:(fun (_, ty) -> ty = ty'))
       ~f:(fun (_, ty') -> subst ty' env)
       ~default:ty
+
   | `Meta { contents = None } -> ty
 
 let instantiate (ty:Type.t) =
@@ -159,11 +170,11 @@ let rec occur (ref:t option ref) (ty:Type.t) : bool =
       | `Box
       | `Fun ->
         List.exists args ~f:(occur ref)
-      | `Prim { prim_type = ty }
       | `Tyfun (_, ty) ->
         occur ref ty
       | _ -> failwith "not impl"
     end
+  | `Prim { prim_type } -> occur ref prim_type
   | `Meta ref2 when phys_equal ref ref2 -> true
   | `Meta { contents = None } -> false
   | `Meta { contents = Some t2 } -> occur ref t2
@@ -189,14 +200,14 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
     when List.length exs = List.length acs ->
     List.iter2_exn exs acs ~f:(fun ex ac -> unify ~ex ~ac)
 
-  | `App (`Prim { prim_type = ex }, []), _ -> unify ~ex ~ac
-  | _, `App (`Prim { prim_type = ac }, []) -> unify ~ex ~ac
-
   | `App (`Fun_printf, []), `App (`Fun_printf, [])
   | `App (`Fun_printf, []), `App (`Fun, _) -> ()
 
   | `Poly _, _ -> unify ~ex:(instantiate ex) ~ac
   | _, `Poly _ -> unify ~ex ~ac:(instantiate ac)
+
+  | `Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
+  | _, `Prim { prim_type } -> unify ~ex ~ac:prim_type
 
   | `Meta ex, `Meta ac when phys_equal ex ac -> ()
   | `Meta { contents = Some ex }, _ -> unify ~ex ~ac

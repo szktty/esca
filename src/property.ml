@@ -16,8 +16,11 @@ let shared : map ref = ref String.Map.empty
 let add target ~name ~value =
   shared := String.Map.add_multi !shared ~key:name ~data:{ target; value }
 
-let add_prim target ~name ~prim ~value =
-  add target ~name ~value:(Method (Type.prim prim (Type.Spec.to_type value)))
+let add_prim target ~name ~id ~value =
+  let pkg, id = id in
+  add target
+    ~name
+    ~value:(Method (Type.prim pkg id (Type.Spec.to_type value)))
 
 let find target name : value option =
   Option.find_map (String.Map.find !shared name)

@@ -6,6 +6,7 @@ and desc = [
   | `App of tycon * t list
   | `Var of tyvar
   | `Poly of tyvar list * t
+  | `Prim of primitive
   | `Meta of metavar
 ]
 
@@ -24,7 +25,6 @@ and tycon = [
   | `Enum of string list
   | `Fun
   | `Fun_printf
-  | `Prim of primitive
   | `Module of string
   | `Stream
   | `Tyfun of tyvar list * t
@@ -36,7 +36,8 @@ and tyvar = string
 and metavar = t option ref
 
 and primitive = {
-  prim_name : string;
+  prim_pkg : string;
+  prim_id : string;
   prim_type : t;
 }
 
@@ -71,8 +72,6 @@ let rec to_string (ty:t) =
       | `Range -> "Range"
       | `Fun -> "Fun"
       | `Fun_printf -> "Fun_printf"
-      | `Prim prim ->
-        Printf.sprintf "Prim(\"%s\", %s)" prim.prim_name (to_string prim.prim_type)
       | `Stream -> "Stream"
       | `Option -> "Option"
       | `Box -> "Box"
@@ -89,17 +88,21 @@ let rec to_string (ty:t) =
   | `Var name -> "Var(" ^ name ^ ")"
   | `Poly (tyvars, ty) ->
     "Poly([" ^ (String.concat tyvars ~sep:", ") ^ "], " ^ to_string ty ^ ")"
+  | `Prim prim ->
+    Printf.sprintf "Prim(\"%s.%s\", %s)"
+      prim.prim_pkg prim.prim_id (to_string prim.prim_type)
 
 let rec unwrap (ty:t) =
   match ty.desc with
   | `Meta { contents = Some ty }
   | `Poly (_, ty) -> unwrap ty
+  | `Prim { prim_type } -> unwrap prim_type
   | _ -> ty
 
 let rec fun_params (ty:t) =
   match (unwrap ty).desc with
   | `App (`Fun, args) -> List.rev args |> List.tl_exn |> List.rev
-  | `App (`Prim { prim_type }, []) -> fun_params prim_type
+  | `Prim { prim_type } -> fun_params prim_type
   | _ -> failwith "not function"
 
 let rec fun_return (ty:t) =
@@ -107,7 +110,7 @@ let rec fun_return (ty:t) =
   | `Meta { contents = Some ty }
   | `Poly (_, ty) -> fun_return ty
   | `App (`Fun, args) -> List.last_exn args
-  | `App (`Prim { prim_type }, []) -> fun_return prim_type
+  | `Prim { prim_type } -> fun_return prim_type
   | _ -> failwith "not function"
 
 let module_name (ty:t) =
@@ -115,13 +118,13 @@ let module_name (ty:t) =
   | `App (`Module name, _) -> Some name
   | _ -> None
 
-let prim_name (ty:t) =
+let prim_id (ty:t) =
   match (unwrap ty).desc with
-  | `App (`Prim { prim_name }, _) -> Some prim_name
+  | `Prim { prim_id } -> Some prim_id
   | _ -> None
 
-let prim_name_exn ty =
-  Option.value_exn (prim_name ty)
+let prim_id_exn ty =
+  Option.value_exn (prim_id ty)
 
 let tyvar name = Located.less @@ `Var name
 let tyvar_a = tyvar "a"
@@ -146,7 +149,6 @@ let desc_fun params ret =
   app ~args:(List.append params [ret]) `Fun
 let desc_fun_printf = app `Fun_printf
 let desc_stream = app `Stream
-let desc_prim name ty = app (`Prim { prim_name = name; prim_type = ty })
 
 let void = Located.less desc_void
 let bool = Located.less desc_bool
@@ -163,7 +165,12 @@ let box e = Located.less @@ desc_box e
 let box_gen = Located.less @@ poly ["a"] (box tyvar_a)
 let fun_ loc params ret = Located.create loc @@ desc_fun params ret
 let fun_printf = Located.less @@ desc_fun_printf
-let prim name ty = Located.less @@ desc_prim name ty
+
+let prim pkg name ty =
+  Located.less @@ `Prim { prim_pkg = pkg;
+                          prim_id = name;
+                          prim_type = ty }
+
 let module_ name = Located.less @@ app (`Module name)
 let stream = Located.less @@ desc_stream 
 

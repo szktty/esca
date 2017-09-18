@@ -21,6 +21,6 @@ let init () =
   let open Type in
   Property.add_prim string
     ~name:"length"
-    ~prim:"StringLength"
+    ~id:("kernel", "StringLength")
     ~value:Spec.(string @-> int);
   ()
