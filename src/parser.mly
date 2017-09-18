@@ -198,7 +198,7 @@ rev_exp_list:
 
 module_def:
   | MODULE LBRACE RBRACE { Ast.nop }
-  | MODULE LBRACE stat_list RBRACE { Ast.nop }
+  | MODULE LBRACE top_stat_list RBRACE { Ast.nop }
 
 struct_def:
   | STRUCT IDENT LBRACE field_def_list RBRACE
@@ -366,7 +366,7 @@ sw_pattern:
 funcall:
   | var_name fun_exp
   { nop }
-  | prefix_exp paren_arg_list
+  | simple_exp paren_arg_list
   {
     `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None; fc_arg_types = None }
   }
@@ -436,17 +436,14 @@ unary_body:
   | FNEG simple_exp { create_unexp $1 `Fneg $2 }
 
 simple_exp:
-  | prefix_exp %prec app { $1 }
-  | literal { $1 }
-
-prefix_exp:
   | var { $1 }
+  | literal { $1 }
   | funcall %prec app { $1 }
   | LPAREN exp RPAREN %prec app { $2 }
   | LPAREN exp COLON type_exp RPAREN %prec app { $2 } (* TODO *)
   | LPAREN if_stat RPAREN { $2 }
   | LPAREN switch_stat RPAREN { $2 }
-  | prefix_exp BANG { `Unwrap $1 }
+  | simple_exp BANG { `Unwrap $1 }
 
 directive:
   | AT IDENT paren_arg_list { `Directive ($2, $3) }
@@ -458,13 +455,13 @@ var:
         var_name = $1;
         var_type = None }
   }
-  | prefix_exp DOT var_name
+  | simple_exp DOT var_name
   { `Var {
         var_prefix = Some $1;
         var_name = $3;
         var_type = None }
   }
-  | prefix_exp LBRACK exp RBRACK
+  | simple_exp LBRACK exp RBRACK
   { `Index { idx_prefix = $1; idx_index = $3; idx_type = None } }
 
 var_name:

@@ -380,9 +380,11 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
         (env, val_ty.desc)
 
       | `Var var ->
+        let name = var.var_name.desc in
         let ty = match Ast.(var.var_prefix) with
           | Some prefix ->
-            begin match (Type.unwrap (easy_infer clos env prefix)).desc with
+            let ty = easy_infer clos env prefix in
+            begin match (Type.unwrap ty).desc with
               | `App (`Module mname, _) ->
                 begin match Library.find_module mname with
                   | None -> failwith (sprintf "unknown module %s" mname)
@@ -392,10 +394,16 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
                     | None -> failwith ("module attribute is not found: " ^ aname)
                     | Some attr -> attr.attr_type
                 end
-              | _ -> failwith "not module"
+              | _ ->
+                (* TODO: property *)
+                match Property.find ty name with
+                | None -> failwith @@ Printf.sprintf "property %s not found" name
+                | Some (Value ty) -> ty
+                | Some (Method _ty) ->
+                  (* TODO: fun *)
+                  failwith "not impl"
             end
           | None ->
-            let name = var.var_name.desc in
             match Env.find env name with
             | None -> failwith ("variable is not found: " ^ name)
             | Some attr -> attr.attr_type

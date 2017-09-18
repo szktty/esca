@@ -170,6 +170,7 @@ FILES[] =
 	module
 	namepath
 	parser
+	property
 	raw_type
 	type
 	typing

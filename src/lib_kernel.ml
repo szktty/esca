@@ -17,4 +17,10 @@ let init () =
                 +> fun_ "printf" Type.Spec.fun_printf
                 +> string "version"
                 |> end_);
+
+  let open Type in
+  Property.add_prim string
+    ~name:"length"
+    ~prim:"StringLength"
+    ~value:Spec.(string @-> int);
   ()
