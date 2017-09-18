@@ -108,13 +108,26 @@ let rec fun_params (ty:t) =
   | `Prim { prim_type } -> fun_params prim_type
   | _ -> failwith "not function"
 
+let rec unwrap_part (f:t) (arg:t) =
+  match f.desc with
+  | `Meta { contents = Some f } -> unwrap_part f arg
+  | `App (`Fun, args) ->
+    (* TODO: check arg type *)
+    Located.create f.loc @@ `App (`Fun, List.tl_exn args)
+  | `Poly (tyvars, f) ->
+    Located.create f.loc @@ `Poly (tyvars, unwrap_part f arg)
+  | `Prim { prim_type } -> unwrap_part prim_type arg
+  | _ ->
+    failwith @@ Printf.sprintf "not function %s" (to_string f)
+
 let rec fun_return (ty:t) =
   match ty.desc with
   | `Meta { contents = Some ty }
   | `Poly (_, ty) -> fun_return ty
   | `App (`Fun, args) -> List.last_exn args
   | `Prim { prim_type } -> fun_return prim_type
-  | _ -> failwith "not function"
+  | `Partial (f, arg) -> fun_return @@ unwrap_part f arg
+  | _ -> failwith @@ Printf.sprintf "not function %s" (to_string ty)
 
 let module_name (ty:t) =
   match (unwrap ty).desc with
@@ -129,8 +142,8 @@ let prim_id (ty:t) =
 let prim_id_exn ty =
   Option.value_exn (prim_id ty)
 
-let partial (base:t) arg = 
-  Located.create base.loc (`Partial (base, arg))
+let partial (ty:t) arg = 
+  Located.create ty.loc (`Partial (ty, arg))
 
 let tyvar name = Located.less @@ `Var name
 let tyvar_a = tyvar "a"

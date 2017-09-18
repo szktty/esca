@@ -214,6 +214,11 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | `Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
   | _, `Prim { prim_type } -> unify ~ex ~ac:prim_type
 
+  | `Partial (ty, arg), _ ->
+    unify ~ex:(Type.unwrap_part ty arg) ~ac
+  | _, `Partial (ty, arg) ->
+    unify ~ex ~ac:(Type.unwrap_part ty arg)
+
   | `Meta ex, `Meta ac when phys_equal ex ac -> ()
   | `Meta { contents = Some ex }, _ -> unify ~ex ~ac
   | _, `Meta { contents = Some ac } -> unify ~ex ~ac
@@ -415,10 +420,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
                 match Property.find ty name with
                 | None -> failwith @@ Printf.sprintf "property %s not found" name
                 | Some (Value ty) -> ty
-                | Some (Method meth_ty) ->
-                  (* TODO: fun *)
-                  let part_ty = Type.partial meth_ty ty in
-                  failwith @@ Printf.sprintf "not impl method: %s" (Type.to_string part_ty)
+                | Some (Method meth_ty) -> Type.partial meth_ty ty
             end
           | None ->
             match Env.find env name with
