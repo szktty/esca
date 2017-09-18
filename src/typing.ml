@@ -94,8 +94,8 @@ let rec generalize (ty:Type.t) : Type.t =
       | `Poly (tyvars, ty) -> `Poly (tyvars, walk ty)
       | `Prim prim ->
         `Prim { prim with prim_type = walk prim.prim_type }
-      | `Partial (ty, args) ->
-        `Partial (walk ty, List.map args ~f:walk)
+      | `Partial (ty, arg) ->
+        `Partial (walk ty, walk arg)
     in
     Located.create ty.loc gen
   in
@@ -138,11 +138,8 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
     Located.create ty.loc @@
     `Prim { prim with prim_type = subst prim.prim_type env }
 
-  | `Partial (ty, args) ->
-    Located.create ty.loc @@
-    let args = List.map args
-        ~f:(fun ty -> subst ty env) in
-    `Partial (subst ty env, args)
+  | `Partial (ty, arg) ->
+    Located.create ty.loc @@ `Partial (subst ty env, subst arg env)
 
   | `Meta { contents = Some ty' } ->
     Option.value_map (List.find env ~f:(fun (_, ty) -> ty = ty'))
@@ -418,9 +415,10 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
                 match Property.find ty name with
                 | None -> failwith @@ Printf.sprintf "property %s not found" name
                 | Some (Value ty) -> ty
-                | Some (Method ty) ->
+                | Some (Method meth_ty) ->
                   (* TODO: fun *)
-                  failwith @@ Printf.sprintf "not impl method: %s" (Type.to_string ty)
+                  let part_ty = Type.partial meth_ty ty in
+                  failwith @@ Printf.sprintf "not impl method: %s" (Type.to_string part_ty)
             end
           | None ->
             match Env.find env name with

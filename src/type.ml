@@ -7,7 +7,7 @@ and desc = [
   | `Var of tyvar
   | `Poly of tyvar list * t
   | `Prim of primitive
-  | `Partial of t * t list (* type * args *)
+  | `Partial of t * t (* type * arg *)
   | `Meta of metavar
 ]
 
@@ -92,12 +92,8 @@ let rec to_string (ty:t) =
   | `Prim prim ->
     Printf.sprintf "Prim(\"%s.%s\", %s)"
       prim.prim_pkg prim.prim_id (to_string prim.prim_type)
-  | `Partial (ty, args) ->
-    let args_s =
-      List.map args ~f:to_string
-      |> String.concat ~sep:", "
-    in
-    Printf.sprintf "Partial(%s, [%s])" (to_string ty) args_s
+  | `Partial (ty, arg) ->
+    Printf.sprintf "Partial(%s, %s)" (to_string ty) (to_string arg)
 
 let rec unwrap (ty:t) =
   match ty.desc with
@@ -132,6 +128,9 @@ let prim_id (ty:t) =
 
 let prim_id_exn ty =
   Option.value_exn (prim_id ty)
+
+let partial (base:t) arg = 
+  Located.create base.loc (`Partial (base, arg))
 
 let tyvar name = Located.less @@ `Var name
 let tyvar_a = tyvar "a"
