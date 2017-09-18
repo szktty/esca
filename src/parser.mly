@@ -246,7 +246,7 @@ rev_variant_param_list:
   | type_exp { [$1] }
   | rev_variant_param_list COMMA type_exp { $3 :: $1 }
 
-  vardef:
+vardef:
   | LET pattern EQ exp
   { `Vardef { vdef_pub = false; vdef_ptn = $2; vdef_exp = $4 } }
   | PUBLIC LET pattern EQ exp
