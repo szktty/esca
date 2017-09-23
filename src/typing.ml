@@ -182,7 +182,6 @@ let rec occur (ref:t option ref) (ty:Type.t) : bool =
   | `Meta { contents = Some t2 } -> occur ref t2
   | _ -> failwith "not impl"
 
-(* 型が合うように、型変数への代入をする (caml2html: typing_unify) *)
 let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   Printf.printf "unify %s and %s\n" (Type.to_string ex) (Type.to_string ac);
   match ex.desc, ac.desc with
@@ -226,21 +225,11 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
       fail_unify ex ac
     else
       ref := Some ex
-                                        (*
-  | `Var({ contents = Some(t1') }), _ -> unify t1' t2
-  | _, `Var({ contents = Some(t2') }) -> unify t1 t2'
-  | `Var({ contents = None } as r1), _ -> (* 一方が未定義の型変数の場合 (caml2html: typing_undef) *)
-    if occur r1 t2 then raise (Unify_error(t1, t2));
-    r1 := Some(t2)
-  | _, `Var({ contents = None } as r2) ->
-    if occur r2 t1 then raise (Unify_error(t1, t2));
-    r2 := Some(t1)
-                                         *)
+
   | _, _ when ex = ac -> ()
   | _, _ ->
     raise (Unify_error { uniexn_ex = ex; uniexn_ac = ac })
 
-(* 型推論ルーチン (caml2html: typing_g) *)
 let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
   Printf.printf "infer e: ";
   Ast.print e;
