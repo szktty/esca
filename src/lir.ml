@@ -270,9 +270,9 @@ module Program = struct
     | Ref_var ref ->
       addln @@ sprintf "%s = %s" ref.ref_var_to.id ref.ref_var_from.id
 
-    | Ref_prop prop ->
+    | Ref_prop ref ->
       addln @@ sprintf "%s = %s.%s"
-        prop.ref_prop_to.id prop.ref_prop_from.id prop.ref_prop_name
+        ref.ref_prop_to.id ref.ref_prop_from.id ref.ref_prop_name
 
     | Null -> add "null"
 
