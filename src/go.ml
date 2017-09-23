@@ -1,3 +1,5 @@
+open Core
+
 module Repr = struct
 
   let of_bool = function
@@ -7,5 +9,11 @@ module Repr = struct
   let of_string s =
     (* TODO: escape *)
     "\"" ^ s ^ "\""
+
+end
+
+module Name = struct
+
+  let property s = "Esca_" ^ s
 
 end

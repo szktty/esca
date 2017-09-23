@@ -272,7 +272,9 @@ module Program = struct
 
     | Ref_prop ref ->
       addln @@ sprintf "%s = %s.%s"
-        ref.ref_prop_to.id ref.ref_prop_from.id ref.ref_prop_name
+        ref.ref_prop_to.id
+        ref.ref_prop_from.id
+        (Go.Name.property ref.ref_prop_name)
 
     | Null -> add "null"
 
