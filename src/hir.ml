@@ -28,6 +28,7 @@ module Op = struct
     | Var of Var.t
     | Ref_fun of Var.t
     | Ref_var of Var.t
+    | Ref_prop of ref_prop
     | Prim of primitive
     | Null
     | Bool of bool
@@ -102,6 +103,12 @@ module Op = struct
   and primitive = {
     prim_id : string;
     prim_type : Type.t;
+  }
+
+  and ref_prop = {
+    ref_prop_obj : t;
+    ref_prop_name : string;
+    ref_prop_ty : Type.t
   }
 
 end
@@ -343,10 +350,19 @@ module Compiler = struct
         | Some id ->
           ctx, Prim { prim_id = id; prim_type = ty }
         | None ->
-          (* TODO: namepath *)
-          match get_var ctx name with
-          | None -> ctx, Ref_fun { Var.id = name; ty }
-          | Some var -> ctx, Ref_var var
+          match var.var_prefix with
+          | None ->
+            begin match get_var ctx name with
+              | None -> ctx, Ref_fun { Var.id = name; ty }
+              | Some var -> ctx, Ref_var var
+            end
+          | Some prefix ->
+            Printf.printf "HIR: property '%s'\n" name;
+            let obj = compile_node' ctx prefix in
+            ctx, Ref_prop { ref_prop_obj = obj;
+                            ref_prop_name = name;
+                            ref_prop_ty = ty }
+
       end
 
     | `Bool value -> ctx, Bool value.desc

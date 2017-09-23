@@ -59,6 +59,7 @@ module Op = struct
     | Var of Register.t
     | Ref_fun of ref_fun
     | Ref_var of ref_var
+    | Ref_prop of ref_prop
     | Prim of primitive
     | Null
     | Void of Register.t
@@ -99,8 +100,14 @@ module Op = struct
   }
 
   and ref_var = {
-    ref_from : Register.t;
-    ref_to : Register.t;
+    ref_var_from : Register.t;
+    ref_var_to : Register.t;
+  }
+
+  and ref_prop = {
+    ref_prop_from : Register.t;
+    ref_prop_to : Register.t;
+    ref_prop_name : string;
   }
 
   and call = {
@@ -261,7 +268,11 @@ module Program = struct
       addln @@ sprintf "%s = %s" ref.ref_fun_to.id ref.ref_fun_from
 
     | Ref_var ref ->
-      addln @@ sprintf "%s = %s" ref.ref_to.id ref.ref_from.id
+      addln @@ sprintf "%s = %s" ref.ref_var_to.id ref.ref_var_from.id
+
+    | Ref_prop prop ->
+      addln @@ sprintf "%s = %s.%s"
+        prop.ref_prop_to.id prop.ref_prop_from.id prop.ref_prop_name
 
     | Null -> add "null"
 
@@ -527,6 +538,7 @@ module Compiler = struct
 
     | Ref_fun var ->
       Printf.printf "LIR: compile ref fun: %s\n" var.id;
+      Printf.printf "type = %s\n" (Type.to_string var.ty);
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Ref_fun {
             ref_fun_from = var.id;
@@ -537,8 +549,18 @@ module Compiler = struct
       Printf.printf "LIR: compile ref var: %s\n" var.id;
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Ref_var {
-            ref_from = get_local_exn ctx var.id;
-            ref_to = reg })
+            ref_var_from = get_local_exn ctx var.id;
+            ref_var_to = reg })
+
+    | Ref_prop prop ->
+      Printf.printf "LIR: compile ref prop: %s\n" prop.ref_prop_name;
+      let ctx = compile_op ctx prop.ref_prop_obj in
+      let obj_reg = ctx.rc in
+      add_var_op ctx (Raw_type.of_type prop.ref_prop_ty)
+        ~f:(fun reg -> Ref_prop {
+            ref_prop_from = obj_reg;
+            ref_prop_name = prop.ref_prop_name;
+            ref_prop_to = reg })
 
     | Int value ->
       add_var_op ctx Raw_type.Int
