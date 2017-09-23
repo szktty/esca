@@ -214,10 +214,10 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | `Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
   | _, `Prim { prim_type } -> unify ~ex ~ac:prim_type
 
-  | `Partial (ty, arg), _ ->
-    unify ~ex:(Type.unwrap_part ty arg) ~ac
-  | _, `Partial (ty, arg) ->
-    unify ~ex ~ac:(Type.unwrap_part ty arg)
+  | `Partial (ty, _), _ ->
+    unify ~ex:(Type.unwrap_part ty) ~ac
+  | _, `Partial (ty, _) ->
+    unify ~ex ~ac:(Type.unwrap_part ty)
 
   | `Meta ex, `Meta ac when phys_equal ex ac -> ()
   | `Meta { contents = Some ex }, _ -> unify ~ex ~ac

@@ -108,17 +108,17 @@ let rec fun_params (ty:t) =
   | `Prim { prim_type } -> fun_params prim_type
   | _ -> failwith "not function"
 
-let rec unwrap_part (f:t) (arg:t) =
-  match f.desc with
-  | `Meta { contents = Some f } -> unwrap_part f arg
+let rec unwrap_part (ty:t) =
+  match ty.desc with
+  | `Meta { contents = Some ty } -> unwrap_part ty
   | `App (`Fun, args) ->
     (* TODO: check arg type *)
-    Located.create f.loc @@ `App (`Fun, List.tl_exn args)
-  | `Poly (tyvars, f) ->
-    Located.create f.loc @@ `Poly (tyvars, unwrap_part f arg)
-  | `Prim { prim_type } -> unwrap_part prim_type arg
+    Located.create ty.loc @@ `App (`Fun, List.tl_exn args)
+  | `Poly (tyvars, ty) ->
+    Located.create ty.loc @@ `Poly (tyvars, unwrap_part ty)
+  | `Prim { prim_type } -> unwrap_part prim_type
   | _ ->
-    failwith @@ Printf.sprintf "not function %s" (to_string f)
+    failwith @@ Printf.sprintf "not function %s" (to_string ty)
 
 let rec fun_return (ty:t) =
   match ty.desc with
@@ -126,7 +126,7 @@ let rec fun_return (ty:t) =
   | `Poly (_, ty) -> fun_return ty
   | `App (`Fun, args) -> List.last_exn args
   | `Prim { prim_type } -> fun_return prim_type
-  | `Partial (f, arg) -> fun_return @@ unwrap_part f arg
+  | `Partial (f, _) -> fun_return @@ unwrap_part f
   | _ -> failwith @@ Printf.sprintf "not function %s" (to_string ty)
 
 let module_name (ty:t) =
