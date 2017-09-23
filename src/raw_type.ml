@@ -98,3 +98,23 @@ let zero = function
   | String -> ""
   | _ -> "nil"
 
+let symbol_prefix = function
+  | Void -> "Void"
+  | Bool -> "Bool"
+  | Uint -> "Uint"
+  | Uint8 -> "Uint8"
+  | Uint16 -> "Uint16"
+  | Uint32 -> "Uint32"
+  | Uint64 -> "Uint64"
+  | Int -> "Int"
+  | Int8 -> "Int8"
+  | Int16 -> "Int16"
+  | Int32 -> "Int32"
+  | Int64 -> "Int64"
+  | Float32 -> "Float32"
+  | Float64 -> "Float64"
+  | String -> "String"
+  | _ -> failwith "not impl"
+
+let symbol_method ty name =
+  Printf.sprintf "EscaMeth_%s_%s" (symbol_prefix ty) name

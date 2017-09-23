@@ -25,6 +25,7 @@ module Op = struct
     | Return of return option
     | Block of t list
     | Call of call
+    | Methcall of method_call
     | Var of Var.t
     | Ref_fun of Var.t
     | Ref_var of Var.t
@@ -93,6 +94,13 @@ module Op = struct
     call_fun : t;
     call_args : t list;
     call_ty : Type.t;
+  }
+
+  and method_call = {
+    mcall_recv : t;
+    mcall_name : string;
+    mcall_args : t list;
+    mcall_ty : Type.t;
   }
 
   and block = {
@@ -333,14 +341,22 @@ module Compiler = struct
 
     | `Funcall call -> 
       Printf.printf "HIR: compile funcall\n";
-      let _, fun_op = compile_node ctx call.fc_fun in
+      let fun_op = compile_node' ctx call.fc_fun in
       let arg_ops =
         List.map call.fc_args
           ~f:(fun arg -> compile_node' ctx arg)
       in
-      ctx, Call { call_fun = fun_op;
-                  call_args = arg_ops;
-                  call_ty = Type.void }
+      begin match fun_op with
+        | Ref_prop ref ->
+          ctx, Methcall { mcall_recv = ref.ref_prop_obj;
+                          mcall_name = ref.ref_prop_name;
+                          mcall_args = arg_ops;
+                          mcall_ty = ref.ref_prop_ty }
+        | _ ->
+          ctx, Call { call_fun = fun_op;
+                      call_args = arg_ops;
+                      call_ty = Type.void } (* TODO *)
+      end
 
     | `Var var ->
       let name = var.var_name.desc in
@@ -362,7 +378,6 @@ module Compiler = struct
             ctx, Ref_prop { ref_prop_obj = obj;
                             ref_prop_name = name;
                             ref_prop_ty = ty }
-
       end
 
     | `Bool value -> ctx, Bool value.desc

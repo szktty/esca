@@ -54,6 +54,7 @@ module Op = struct
     | Label of label
 
     | Call of call
+    | Methcall of method_call
     | Block of t list
     | Terminal
     | Var of Register.t
@@ -114,6 +115,13 @@ module Op = struct
     call_rc : Register.t;
     call_fun : Register.t;
     call_args : Register.t list;
+  }
+
+  and method_call = {
+    mcall_rc : Register.t;
+    mcall_recv : Register.t;
+    mcall_name : string;
+    mcall_args : Register.t list;
   }
 
   and primitive = {
@@ -260,6 +268,16 @@ module Program = struct
             add @@ String.concat ~sep:"," (Register.ids call.call_args);
             add ")")
 
+    | Methcall call ->
+      Printf.printf "method call\n";
+      let args = call.mcall_recv :: call.mcall_args in
+      with_exp buf call.mcall_rc.id
+        ~f:(fun _ ->
+            add call.mcall_name;
+            add "(";
+            add @@ String.concat ~sep:"," (Register.ids args);
+            add ")")
+
     | Prim prim ->
       let bridge = bridge_prim_id prim.prim_id in
       with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
@@ -271,10 +289,11 @@ module Program = struct
       addln @@ sprintf "%s = %s" ref.ref_var_to.id ref.ref_var_from.id
 
     | Ref_prop ref ->
+      Printf.printf "write: ref_prop %s\n" (Raw_type.to_string ref.ref_prop_from.ty);
       addln @@ sprintf "%s = %s.%s"
         ref.ref_prop_to.id
         ref.ref_prop_from.id
-        (Go.Name.property ref.ref_prop_name)
+        ref.ref_prop_name
 
     | Null -> add "null"
 
@@ -525,6 +544,19 @@ module Compiler = struct
         ~f:(fun reg -> Call { call_rc = reg;
                               call_fun = fun_reg;
                               call_args = arg_regs })
+
+    | Methcall call ->
+      Printf.printf "LIR: compile primitive method call\n";
+      let ctx = compile_op ctx call.mcall_recv in
+      let fun_ty = Raw_type.of_type call.mcall_ty in
+      let recv_reg = ctx.rc in
+      let ctx, arg_regs = compile_exps ctx call.mcall_args in
+      let name = Raw_type.symbol_method recv_reg.ty call.mcall_name in
+      add_var_op ctx (Raw_type.return_ty_exn fun_ty)
+        ~f:(fun reg -> Methcall { mcall_rc = reg;
+                                  mcall_recv = recv_reg;
+                                  mcall_name = name;
+                                  mcall_args = arg_regs })
 
     | Prim prim ->
       let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_type) in
