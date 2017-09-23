@@ -204,6 +204,12 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | `App (`Fun_printf, []), `App (`Fun_printf, [])
   | `App (`Fun_printf, []), `App (`Fun, _) -> ()
 
+  | `App (`Method _, exs), `App (`Method _, acs)
+  | `App (`Fun, exs), `App (`Method _, acs)
+  | `App (`Method _, exs), `App (`Fun, acs)
+    when List.length exs = List.length acs ->
+    List.iter2_exn exs acs ~f:(fun ex ac -> unify ~ex ~ac)
+
   | `Poly _, _ -> unify ~ex:(instantiate ex) ~ac
   | _, `Poly _ -> unify ~ex ~ac:(instantiate ac)
 

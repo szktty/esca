@@ -123,7 +123,8 @@ let rec fun_return (ty:t) =
   match ty.desc with
   | `Meta { contents = Some ty }
   | `Poly (_, ty) -> fun_return ty
-  | `App (`Fun, args) -> List.last_exn args
+  | `App (`Fun, args) 
+  | `App (`Method _, args) -> List.last_exn args
   | `Prim { prim_type } -> fun_return prim_type
   | _ -> failwith @@ Printf.sprintf "not function %s" (to_string ty)
 

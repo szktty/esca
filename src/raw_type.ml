@@ -32,7 +32,8 @@ let rec of_type (ty:Type.t) : t =
   | `App (`Int, []) -> Int
   | `App (`Float, []) -> Float32
   | `App (`String, []) -> String
-  | `App (`Fun, args) ->
+  | `App (`Fun, args)
+  | `App (`Method _, args) ->
     let rec collect args accu =
       match args with
       | [] -> failwith "error"

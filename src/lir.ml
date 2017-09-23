@@ -555,7 +555,8 @@ module Compiler = struct
             ref_var_to = reg })
 
     | Ref_prop prop ->
-      Printf.printf "LIR: compile ref prop: %s\n" prop.ref_prop_name;
+      Printf.printf "LIR: compile ref prop: %s: %s\n"
+        prop.ref_prop_name (Type.to_string prop.ref_prop_ty);
       let ctx = compile_op ctx prop.ref_prop_obj in
       let obj_reg = ctx.rc in
       add_var_op ctx (Raw_type.of_type prop.ref_prop_ty)
