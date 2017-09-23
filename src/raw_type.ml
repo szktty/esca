@@ -42,7 +42,6 @@ let rec of_type (ty:Type.t) : t =
     in
     collect args []
   | `Prim { prim_type } -> of_type prim_type
-  | `Partial (ty, _) -> of_type @@ Type.unwrap_part ty
   | _ -> Printf.printf "type = %s\n" (Type.to_string ty);
     failwith "of_type: not supported"
 

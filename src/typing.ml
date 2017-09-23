@@ -94,8 +94,6 @@ let rec generalize (ty:Type.t) : Type.t =
       | `Poly (tyvars, ty) -> `Poly (tyvars, walk ty)
       | `Prim prim ->
         `Prim { prim with prim_type = walk prim.prim_type }
-      | `Partial (ty, arg) ->
-        `Partial (walk ty, walk arg)
     in
     Located.create ty.loc gen
   in
@@ -137,9 +135,6 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
   | `Prim prim ->
     Located.create ty.loc @@
     `Prim { prim with prim_type = subst prim.prim_type env }
-
-  | `Partial (ty, arg) ->
-    Located.create ty.loc @@ `Partial (subst ty env, subst arg env)
 
   | `Meta { contents = Some ty' } ->
     Option.value_map (List.find env ~f:(fun (_, ty) -> ty = ty'))
@@ -213,11 +208,6 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
 
   | `Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
   | _, `Prim { prim_type } -> unify ~ex ~ac:prim_type
-
-  | `Partial (ty, _), _ ->
-    unify ~ex:(Type.unwrap_part ty) ~ac
-  | _, `Partial (ty, _) ->
-    unify ~ex ~ac:(Type.unwrap_part ty)
 
   | `Meta ex, `Meta ac when phys_equal ex ac -> ()
   | `Meta { contents = Some ex }, _ -> unify ~ex ~ac
@@ -420,7 +410,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
                 match Property.find ty name with
                 | None -> failwith @@ Printf.sprintf "property %s not found" name
                 | Some (Value ty) -> ty
-                | Some (Method meth_ty) -> Type.partial meth_ty ty
+                | Some (Method meth_ty) -> meth_ty (* TODO *)
             end
           | None ->
             match Env.find env name with

@@ -7,7 +7,6 @@ and desc = [
   | `Var of tyvar
   | `Poly of tyvar list * t
   | `Prim of primitive
-  | `Partial of t * t (* type * arg *)
   | `Meta of metavar
 ]
 
@@ -92,8 +91,6 @@ let rec to_string (ty:t) =
   | `Prim prim ->
     Printf.sprintf "Prim(\"%s.%s\", %s)"
       prim.prim_pkg prim.prim_id (to_string prim.prim_type)
-  | `Partial (ty, arg) ->
-    Printf.sprintf "Partial(%s, %s)" (to_string ty) (to_string arg)
 
 let rec unwrap (ty:t) =
   match ty.desc with
@@ -126,7 +123,6 @@ let rec fun_return (ty:t) =
   | `Poly (_, ty) -> fun_return ty
   | `App (`Fun, args) -> List.last_exn args
   | `Prim { prim_type } -> fun_return prim_type
-  | `Partial (f, _) -> fun_return @@ unwrap_part f
   | _ -> failwith @@ Printf.sprintf "not function %s" (to_string ty)
 
 let module_name (ty:t) =
@@ -141,9 +137,6 @@ let prim_id (ty:t) =
 
 let prim_id_exn ty =
   Option.value_exn (prim_id ty)
-
-let partial (ty:t) arg = 
-  Located.create ty.loc (`Partial (ty, arg))
 
 let tyvar name = Located.less @@ `Var name
 let tyvar_a = tyvar "a"
