@@ -25,6 +25,7 @@ and tycon = [
   | `Enum of string list
   | `Fun
   | `Fun_printf
+  | `Method of t
   | `Module of string
   | `Stream
   | `Tyfun of tyvar list * t
@@ -72,6 +73,7 @@ let rec to_string (ty:t) =
       | `Range -> "Range"
       | `Fun -> "Fun"
       | `Fun_printf -> "Fun_printf"
+      | `Method ty -> Printf.sprintf "Method(%s)" (to_string ty)
       | `Stream -> "Stream"
       | `Option -> "Option"
       | `Box -> "Box"
@@ -177,6 +179,17 @@ let box e = Located.less @@ desc_box e
 let box_gen = Located.less @@ poly ["a"] (box tyvar_a)
 let fun_ loc params ret = Located.create loc @@ desc_fun params ret
 let fun_printf = Located.less @@ desc_fun_printf
+
+let fun_to_method (f:t) : t = 
+  let rec to_method (ty:t) =
+    match ty.desc with
+    | `Meta { contents = Some ty } -> to_method ty
+    | `App (`Fun, recv :: args) -> `App (`Method recv, args)
+    | `Poly (tyvars, ty) ->
+      `Poly (tyvars, Located.create ty.loc (to_method ty))
+    | _ -> failwith "not supported"
+  in
+  Located.create f.loc (to_method f)
 
 let prim pkg name ty =
   Located.less @@ `Prim { prim_pkg = pkg;

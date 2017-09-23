@@ -1,33 +1,26 @@
 open Core
 
-type value =
-  | Method of Type.t
-  | Value of Type.t
-
 type t = {
   target : Type.t;
-  value : value;
+  ty : Type.t;
 }
 
 type map = t list String.Map.t
 
 let shared : map ref = ref String.Map.empty
 
-let add target ~name ~value =
-  shared := String.Map.add_multi !shared ~key:name ~data:{ target; value }
+let add target ~name ~ty =
+  shared := String.Map.add_multi !shared ~key:name ~data:{ target; ty }
 
-let add_prim target ~name ~id ~value =
-  let pkg, id = id in
-  add target
-    ~name
-    ~value:(Method (Type.prim pkg id (Type.Spec.to_type value)))
+let add_method target ~name ~spec =
+  add target ~name ~ty:(Type.fun_to_method @@ Type.Spec.to_type spec)
 
-let find target name : value option =
+let find target name : Type.t option =
   Option.find_map (String.Map.find !shared name)
     ~f:(fun props ->
         List.find_map props
           ~f:(fun prop ->
               if Type.equal prop.target target then
-                Some prop.value
+                Some prop.ty
               else
                 None))

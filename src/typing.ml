@@ -170,6 +170,8 @@ let rec occur (ref:t option ref) (ty:Type.t) : bool =
       | `Box
       | `Fun ->
         List.exists args ~f:(occur ref)
+      | `Method recv ->
+        List.exists (recv :: args) ~f:(occur ref)
       | `Tyfun (_, ty) ->
         occur ref ty
       | _ -> failwith "not impl"
@@ -406,11 +408,9 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
                     | Some attr -> attr.attr_type
                 end
               | _ ->
-                (* TODO: property *)
                 match Property.find ty name with
                 | None -> failwith @@ Printf.sprintf "property %s not found" name
-                | Some (Value ty) -> ty
-                | Some (Method meth_ty) -> meth_ty (* TODO *)
+                | Some ty -> ty
             end
           | None ->
             match Env.find env name with

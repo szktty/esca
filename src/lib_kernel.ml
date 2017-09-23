@@ -19,8 +19,7 @@ let init () =
                 |> end_);
 
   let open Type in
-  Property.add_prim string
+  Property.add_method string
     ~name:"length"
-    ~id:("kernel", "StringLength")
-    ~value:Spec.(string @-> int);
+    ~spec:Spec.(string @-> int);
   ()
