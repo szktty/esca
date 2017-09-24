@@ -55,6 +55,7 @@ module Op = struct
 
     | Call of call
     | Methcall of method_call
+    | Binexp of binexp
     | Block of t list
     | Terminal
     | Var of Register.t
@@ -122,6 +123,13 @@ module Op = struct
     mcall_recv : Register.t;
     mcall_name : string;
     mcall_args : Register.t list;
+  }
+
+  and binexp = {
+    binexp_rc : Register.t;
+    binexp_left : Register.t;
+    binexp_op : Hir.Binop.t;
+    binexp_right : Register.t;
   }
 
   and primitive = {
@@ -277,6 +285,24 @@ module Program = struct
             add "(";
             add @@ String.concat ~sep:"," (Register.ids args);
             add ")")
+
+    | Binexp exp ->
+      Printf.printf "binexp\n";
+      let op = match exp.binexp_op with
+        | Eq -> "=="
+        | Ne -> "!="
+        | Lt -> "<"
+        | Le -> "<="
+        | Gt -> ">"
+        | Ge -> ">="
+        | Add -> "+"
+        | Sub -> "-"
+        | _ -> failwith "not impl"
+      in
+      with_exp buf exp.binexp_rc.id
+        ~f:(fun _ ->
+            add @@ sprintf "%s %s %s" exp.binexp_left.id
+              op exp.binexp_right.id)
 
     | Prim prim ->
       let bridge = bridge_prim_id prim.prim_id in
@@ -557,6 +583,18 @@ module Compiler = struct
                                   mcall_recv = recv_reg;
                                   mcall_name = name;
                                   mcall_args = arg_regs })
+
+    | Binexp exp ->
+      Printf.printf "LIR: compile binexp\n";
+      let ctx = compile_op ctx exp.binexp_left in
+      let left_op = ctx.rc in
+      let ctx = compile_op ctx exp.binexp_right in
+      let right_op = ctx.rc in
+      add_var_op ctx (Raw_type.of_type exp.binexp_ty)
+        ~f:(fun reg -> Binexp { binexp_rc = reg;
+                                binexp_left = left_op;
+                                binexp_op = exp.binexp_op;
+                                binexp_right = right_op })
 
     | Prim prim ->
       let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_type) in

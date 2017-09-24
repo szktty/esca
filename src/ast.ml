@@ -188,8 +188,8 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
   | `Void _ -> add_string "()"
   | `Bool { desc = true } -> add_string "true"
   | `Bool { desc = false } -> add_string "false"
-  | `Int v -> add_string @@ sprintf "%d" v.desc
-  | `Float v -> add_string @@ sprintf "%f" v.desc
+  | `Int v -> add_string @@ sprintf "(int %d)" v.desc
+  | `Float v -> add_string @@ sprintf "(float %f)" v.desc
   | `String s -> add_string @@ sprintf "\"%s\"" s.desc
   | `List exps ->
     add_string "(list ";
@@ -303,6 +303,7 @@ let rec type_ (node:t) =
       | `Eq | `Ne | `Lt | `Le | `Gt | `Ge -> Some Type.bool
       | _ -> type_ exp.binexp_left
     end
+  | `Var var -> Some (Option.value_exn var.var_type)
   | `Bool _ -> Some Type.bool
   | `Int _ -> Some Type.int
   | `String _ -> Some Type.string

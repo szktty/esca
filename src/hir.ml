@@ -13,6 +13,22 @@ module Var = struct
 
 end
 
+module Binop = struct
+
+  type t =
+    | Eq
+    | Ne
+    | Lt
+    | Le
+    | Gt
+    | Ge
+    | Add
+    | Sub
+    | Mul
+    | Div
+
+end
+
 module Op = struct
 
   type t =
@@ -26,6 +42,7 @@ module Op = struct
     | Block of t list
     | Call of call
     | Methcall of method_call
+    | Binexp of binexp
     | Var of Var.t
     | Ref_fun of Var.t
     | Ref_var of Var.t
@@ -101,6 +118,13 @@ module Op = struct
     mcall_name : string;
     mcall_args : t list;
     mcall_ty : Type.t;
+  }
+
+  and binexp = {
+    binexp_left : t;
+    binexp_op : Binop.t;
+    binexp_right : t;
+    binexp_ty : Type.t;
   }
 
   and block = {
@@ -227,6 +251,7 @@ module Compiler = struct
     let open Op in
     let open Context in
 
+    Ast.print node;
     match node with
     | `Chunk chunk ->
       let ctx, _ = compile_fold ctx chunk.ch_attrs in
@@ -357,6 +382,27 @@ module Compiler = struct
                       call_args = arg_ops;
                       call_ty = Type.void } (* TODO *)
       end
+
+    | `Binexp exp ->
+      let left = compile_node' ctx exp.binexp_left in
+      let right = compile_node' ctx exp.binexp_right in
+      let op : Binop.t = match exp.binexp_op.desc with
+        | `Eq -> Eq
+        | `Ne -> Ne
+        | `Lt -> Lt
+        | `Le -> Le
+        | `Gt -> Gt
+        | `Ge -> Ge
+        | `Add -> Add
+        | `Sub -> Sub
+        | `Mul -> Mul
+        | `Div -> Div
+        | _ -> failwith "not impl"
+      in
+      ctx, Binexp { binexp_left = left;
+                    binexp_op = op;
+                    binexp_right = right;
+                    binexp_ty = Ast.type_exn node }
 
     | `Var var ->
       let name = var.var_name.desc in
