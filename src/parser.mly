@@ -108,7 +108,7 @@ let create_unexp op_loc op exp =
 %nonassoc LBRACE
 
 %nonassoc app
-%nonassoc LPAREN
+%nonassoc LPAREN LBRACK
 
 %start <Ast.t> prog
 
@@ -187,7 +187,7 @@ exp:
   | fun_exp { $1 }
   | bin_exp { $1 }
   | unary_exp { $1 }
-  | simple_exp { $1 }
+  | simple_exp %prec app { $1 }
 
 exp_list:
   | rev_exp_list { Core.Std.List.rev $1 }
@@ -446,7 +446,7 @@ unary_body:
   | FNEG simple_exp { create_unexp $1 `Fneg $2 }
 
 simple_exp:
-  | var { $1 }
+  | var %prec app { $1 }
   | literal { $1 }
   | funcall %prec app { $1 }
   | LPAREN exp RPAREN %prec app { $2 }
@@ -471,7 +471,7 @@ var:
         var_name = $3;
         var_type = None }
   }
-  | simple_exp LBRACK exp RBRACK
+  | var LBRACK exp RBRACK
   { `Index { idx_prefix = $1; idx_index = $3; idx_type = None } }
 
 var_name:
