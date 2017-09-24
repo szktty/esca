@@ -25,9 +25,19 @@ module Register = struct
 
 end
 
-type label = string
+module Binop = struct
+
+  type t =
+    | Add
+    | Sub
+    | Mul
+    | Div
+
+end
 
 module Op = struct
+
+  type label = string
 
   type t =
     | Nop
@@ -40,12 +50,17 @@ module Op = struct
     | Defer of t
 
     | Move of move
-    | Eq of Register.t * Register.t
     | Eq_void of Register.t
     | Eq_bool of Register.t * bool
     | Eq_int of Register.t * int
     | Eq_float of Register.t * float
     | Eq_string of Register.t * string
+    | Eq of Register.t * Register.t
+    | Ne of Register.t * Register.t
+    | Lt of Register.t * Register.t
+    | Le of Register.t * Register.t
+    | Gt of Register.t * Register.t
+    | Ge of Register.t * Register.t
     | Branch of branch
     | Jump of label
     | Return of Register.t
@@ -236,7 +251,7 @@ module Program = struct
       if not br.br_cond then begin
         add "!"
       end;
-      addln @@ sprintf "fr {";
+      addln @@ sprintf "%s {" flag;
       addln @@ sprintf "goto %s" br.br_dest;
       addln "}"
 
@@ -260,6 +275,24 @@ module Program = struct
 
     | Eq_string (reg, v) ->
       addln @@ sprintf "%s = %s == %s" flag reg.id (Go.Repr.of_string v)
+
+    | Eq (left, right) ->
+      addln @@ sprintf "%s = %s == %s" flag left.id right.id
+
+    | Ne (left, right) ->
+      addln @@ sprintf "%s = %s != %s" flag left.id right.id
+
+    | Lt (left, right) ->
+      addln @@ sprintf "%s = %s < %s" flag left.id right.id
+
+    | Le (left, right) ->
+      addln @@ sprintf "%s = %s <= %s" flag left.id right.id
+
+    | Gt (left, right) ->
+      addln @@ sprintf "%s = %s > %s" flag left.id right.id
+
+    | Ge (left, right) ->
+      addln @@ sprintf "%s = %s >= %s" flag left.id right.id
 
     | Return reg ->
       addln @@ sprintf "return %s" reg.id
@@ -289,12 +322,6 @@ module Program = struct
     | Binexp exp ->
       Printf.printf "binexp\n";
       let op = match exp.binexp_op with
-        | Eq -> "=="
-        | Ne -> "!="
-        | Lt -> "<"
-        | Le -> "<="
-        | Gt -> ">"
-        | Ge -> ">="
         | Add -> "+"
         | Sub -> "-"
         | _ -> failwith "not impl"
@@ -391,7 +418,7 @@ module Context = struct
     local_map : Register.t String.Map.t;
     rc : Register.t;
     flag : Register.id;
-    labels : label list;
+    labels : Op.label list;
     main : Register.t option; (* TODO: unused? *)
   }
 
@@ -590,11 +617,20 @@ module Compiler = struct
       let left_op = ctx.rc in
       let ctx = compile_op ctx exp.binexp_right in
       let right_op = ctx.rc in
-      add_var_op ctx (Raw_type.of_type exp.binexp_ty)
-        ~f:(fun reg -> Binexp { binexp_rc = reg;
-                                binexp_left = left_op;
-                                binexp_op = exp.binexp_op;
-                                binexp_right = right_op })
+      begin match exp.binexp_op with
+        | Eq -> add_op ctx @@ Eq (left_op, right_op)
+        | Ne -> add_op ctx @@ Ne (left_op, right_op)
+        | Lt -> add_op ctx @@ Lt (left_op, right_op)
+        | Le -> add_op ctx @@ Le (left_op, right_op)
+        | Gt -> add_op ctx @@ Gt (left_op, right_op)
+        | Ge -> add_op ctx @@ Ge (left_op, right_op)
+        | _ ->
+          add_var_op ctx (Raw_type.of_type exp.binexp_ty)
+            ~f:(fun reg -> Binexp { binexp_rc = reg;
+                                    binexp_left = left_op;
+                                    binexp_op = exp.binexp_op;
+                                    binexp_right = right_op })
+      end
 
     | Prim prim ->
       let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_type) in
