@@ -294,8 +294,15 @@ let print node =
 let print_tyexp node =
   Printf.printf "%s\n" (tyexp_to_string node)
 
-let type_ (node:t) =
+let rec type_ (node:t) =
   match node with
+  | `Funcall call ->
+    Some (Type.fun_return (Option.value_exn call.fc_fun_type))
+  | `Binexp exp ->
+    begin match exp.binexp_op.desc with
+      | `Eq | `Ne | `Lt | `Le | `Gt | `Ge -> Some Type.bool
+      | _ -> type_ exp.binexp_left
+    end
   | `Bool _ -> Some Type.bool
   | `Int _ -> Some Type.int
   | `String _ -> Some Type.string
