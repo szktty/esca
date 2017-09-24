@@ -38,3 +38,5 @@ esca
 
 # others
 .*.swp
+examples/*.go
+src/test
