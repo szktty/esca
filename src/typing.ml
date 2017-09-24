@@ -350,6 +350,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
         Printf.printf "# funcall ";
         Ast.print e;
         let ex_fun = easy_infer clos env call.fc_fun in
+        call.fc_fun_type <- Some ex_fun;
         Printf.printf "# funcall infer ex: %s\n" (Type.to_string ex_fun);
 
         if Type.equal ex_fun Type.fun_printf then begin
