@@ -368,20 +368,20 @@ funcall:
   { nop }
   | simple_exp paren_arg_list
   {
-    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None; fc_arg_types = None }
+    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None }
   }
   | LPAREN exp RPAREN paren_arg_list
   {
-    `Funcall { fc_fun = $2; fc_args = $4; fc_fun_type = None; fc_arg_types = None }
+    `Funcall { fc_fun = $2; fc_args = $4; fc_fun_type = None }
   }
   | LPAREN exp COLON type_exp RPAREN paren_arg_list
   {
     (* TODO *)
-    `Funcall { fc_fun = $2; fc_args = $6; fc_fun_type = None; fc_arg_types = None }
+    `Funcall { fc_fun = $2; fc_args = $6; fc_fun_type = None }
   }
   | funcall paren_arg_list
   {
-    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None; fc_arg_types = None }
+    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None }
   }
 
 paren_arg_list:

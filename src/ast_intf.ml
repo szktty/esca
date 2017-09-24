@@ -158,7 +158,6 @@ and funcall = {
   fc_fun : t;
   fc_args : t list;
   mutable fc_fun_type : Type.t option;
-  mutable fc_arg_types : Type.t list option;
 }
 
 and index = {
