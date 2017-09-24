@@ -197,7 +197,7 @@ module Program = struct
     add_string buf "import (\n";
     List.iter basic_pkgs
       ~f:(fun pkg ->
-          add_string buf @@ sprintf ". \"%s/%s\"\n" !Config.runlib_path pkg);
+          add_string buf @@ sprintf "\"%s/%s\"\n" !Config.runlib_path pkg);
     add_string buf ")\n\n"
 
   and write_main buf prog =
