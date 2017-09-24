@@ -13,6 +13,7 @@ let init () =
                 +> typ "Box" Type.box_gen
                 +> typ "Stream" Type.stream
                 +> fun_ "id" Type.Spec.(a @-> a)
+                +> fun_ "show" Type.Spec.(a @-> void)
                 +> fun_ "print" Type.Spec.(string @-> void)
                 +> fun_ "printf" Type.Spec.fun_printf
                 +> string "version"
