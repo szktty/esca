@@ -60,7 +60,7 @@ let command =
            else if debug_ast then
              (* TODO: printing node *)
              let node = parse_file file in
-             Ast.write Out_channel.stdout node
+             Ast.print node
            else begin
              let node = parse_file file in
              ignore @@ Typing.run node;
