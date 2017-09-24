@@ -425,11 +425,11 @@ module Context = struct
     { ctx with rc = reg }, reg
 
   let new_param ctx ~ty ~name =
-    let ctx, reg = new_reg ctx ty ~prefix:"t" ~scope:`Param in
+    let ctx, reg = new_reg ctx ty ~prefix:"r" ~scope:`Param in
     add_local_map ctx name reg, reg
 
   let new_local ctx ty =
-    new_reg ctx ty ~prefix:"t" ~scope:`Local
+    new_reg ctx ty ~prefix:"r" ~scope:`Local
 
   let get_local_exn ctx id =
     String.Map.find_exn ctx.local_map id
