@@ -253,6 +253,16 @@ vardef:
   { `Vardef { vdef_pub = true; vdef_ptn = $3; vdef_exp = $5 } }
 
 fundef:
+  | FUNC var_name LBRACE block RBRACE
+  {
+    `Fundef {
+        fdef_name = $2;
+        fdef_params = [];
+        fdef_ret = None;
+        fdef_block = $4;
+        fdef_type = None;
+    }
+  }
   | FUNC var_name param_list LBRACE block RBRACE
   {
     `Fundef {
