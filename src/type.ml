@@ -5,7 +5,7 @@ type t = desc Located.t
 and desc = [
   | `App of tycon * t list
   | `Var of tyvar
-  | `Poly of tyvar list * t
+  | `Poly of [ `Preunify of tyvar list * t | `Unify of t ] ref
   | `Prim of primitive
   | `Meta of metavar
 ]
@@ -88,8 +88,11 @@ let rec to_string (ty:t) =
   | `Meta { contents = None } -> "Meta(?)"
   | `Meta { contents = Some ty } -> "Meta(" ^ to_string ty ^ ")"
   | `Var name -> "Var(" ^ name ^ ")"
-  | `Poly (tyvars, ty) ->
-    "Poly([" ^ (String.concat tyvars ~sep:", ") ^ "], " ^ to_string ty ^ ")"
+  | `Poly { contents = `Preunify (tyvars, ty) } ->
+    Printf.sprintf "Poly([%s], %s)"
+      (String.concat tyvars ~sep:", ") (to_string ty)
+  | `Poly { contents = `Unify ty } ->
+    Printf.sprintf "Poly(%s)" (to_string ty)
   | `Prim prim ->
     Printf.sprintf "Prim(\"%s.%s\", %s)"
       prim.prim_pkg prim.prim_id (to_string prim.prim_type)
@@ -97,7 +100,8 @@ let rec to_string (ty:t) =
 let rec unwrap (ty:t) =
   match ty.desc with
   | `Meta { contents = Some ty }
-  | `Poly (_, ty) -> unwrap ty
+  | `Poly { contents = `Preunify (_, ty) }  -> unwrap ty
+  | `Poly { contents = `Unify ty } -> unwrap ty
   | `Prim { prim_type } -> unwrap prim_type
   | _ -> ty
 
@@ -107,22 +111,11 @@ let rec fun_params (ty:t) =
   | `Prim { prim_type } -> fun_params prim_type
   | _ -> failwith "not function"
 
-let rec unwrap_part (ty:t) =
-  match ty.desc with
-  | `Meta { contents = Some ty } -> unwrap_part ty
-  | `App (`Fun, args) ->
-    (* TODO: check arg type *)
-    Located.create ty.loc @@ `App (`Fun, List.tl_exn args)
-  | `Poly (tyvars, ty) ->
-    Located.create ty.loc @@ `Poly (tyvars, unwrap_part ty)
-  | `Prim { prim_type } -> unwrap_part prim_type
-  | _ ->
-    failwith @@ Printf.sprintf "not function %s" (to_string ty)
-
 let rec fun_return (ty:t) =
   match ty.desc with
   | `Meta { contents = Some ty }
-  | `Poly (_, ty) -> fun_return ty
+  | `Poly { contents = `Preunify (_, ty) } -> fun_return ty
+  | `Poly { contents = `Unify ty } -> fun_return ty
   | `App (`Fun, args) 
   | `App (`Method _, args) -> List.last_exn args
   | `Prim { prim_type } -> fun_return prim_type
@@ -147,7 +140,7 @@ let tyvar_b = tyvar "b"
 let tyvar_c = tyvar "c"
 let tyvar_d = tyvar "d"
 
-let poly tyvars ty = `Poly (tyvars, ty)
+let poly tyvars (ty:t) : desc = `Poly (ref (`Preunify (tyvars, ty)))
 
 let app ?(args=[]) tycon = `App (tycon, args)
 let desc_void = app `Void
@@ -186,8 +179,9 @@ let fun_to_method (f:t) : t =
     match ty.desc with
     | `Meta { contents = Some ty } -> to_method ty
     | `App (`Fun, recv :: args) -> `App (`Method recv, args)
-    | `Poly (tyvars, ty) ->
-      `Poly (tyvars, Located.create ty.loc (to_method ty))
+    | `Poly { contents = `Preunify (tyvars, ty) } ->
+      `Poly (ref (`Preunify (tyvars, (Located.create ty.loc (to_method ty)))))
+    | `Poly { contents = `Unify ty } -> to_method ty
     | _ -> failwith "not supported"
   in
   Located.create f.loc (to_method f)
@@ -305,6 +299,6 @@ module Spec = struct
     | [], desc -> Located.less desc
     | tyvars, desc ->
       let tyvars = flat_tyvars tyvars in
-      Located.less @@ `Poly (tyvars, Located.less desc)
+      Located.less @@ poly tyvars (Located.less desc)
 
 end

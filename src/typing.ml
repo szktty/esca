@@ -72,7 +72,7 @@ let rec generalize (ty:Type.t) : Type.t =
     Array.get tyvar_names @@ List.length !tyvars
   in
 
-  let rec walk ty =
+  let rec walk ty : t =
     let gen = match ty.desc with
       | `App (tycon, args) ->
         let gen_tycon = match tycon with
@@ -91,7 +91,10 @@ let rec generalize (ty:Type.t) : Type.t =
         in
         `Var tyvar
       | `Meta ({ contents = Some ty }) -> (walk ty).desc
-      | `Poly (tyvars, ty) -> `Poly (tyvars, walk ty)
+      | `Poly ({ contents = `Preunify (tyvars, ty) } as ref) ->
+        ref := `Preunify (tyvars, walk ty);
+        `Poly ref
+      | `Poly _ -> ty.desc
       | `Prim prim ->
         `Prim { prim with prim_type = walk prim.prim_type }
     in
@@ -103,7 +106,7 @@ let rec generalize (ty:Type.t) : Type.t =
     gen
   else begin
     let tyvars = List.rev_map !tyvars ~f:(fun (_, tyvar) -> tyvar) in
-    Located.create ty.loc @@ `Poly (tyvars, gen)
+    Located.create ty.loc @@ Type.poly tyvars gen
   end
 
 let rec subst (ty:Type.t) (env:(tyvar * t) list) =
@@ -121,7 +124,7 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
         ~f:(fun ty' -> subst ty' env) in
     Located.create ty.loc @@ `App (tycon, args')
 
-  | `Poly (tyvars, ty') ->
+  | `Poly ({ contents = `Preunify (tyvars, ty') } as ref) ->
     let tyvars' = List.mapi tyvars
         ~f:(fun i _tyvar ->
             Array.get Type.var_names (i + List.length env))
@@ -130,7 +133,10 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
         ~f:(fun tyvar tyvar' ->
             (tyvar, Located.create ty.loc @@ `Var tyvar'))
     in
-    Located.create ty.loc @@ `Poly (tyvars', subst ty'' env)
+    ref := `Unify (subst ty'' env);
+    ty
+
+  | `Poly _ -> ty
 
   | `Prim prim ->
     Located.create ty.loc @@
@@ -145,11 +151,12 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
 
 let instantiate (ty:Type.t) =
   match ty.desc with
-  | `Poly (tyvars, ty') ->
+  | `Poly ({ contents = `Preunify (tyvars, ty') } as ref) ->
     let env = List.map tyvars
         ~f:(fun tyvar ->
             (tyvar, create_metavar ty.loc)) in
-    subst ty' env
+    ref := `Unify (subst ty' env);
+    ty
   | _ -> ty
 
 let rec occur (ref:t option ref) (ty:Type.t) : bool =
@@ -210,8 +217,10 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
     when List.length exs = List.length acs ->
     List.iter2_exn exs acs ~f:(fun ex ac -> unify ~ex ~ac)
 
-  | `Poly _, _ -> unify ~ex:(instantiate ex) ~ac
-  | _, `Poly _ -> unify ~ex ~ac:(instantiate ac)
+  | `Poly { contents = `Preunify _ }, _ -> unify ~ex:(instantiate ex) ~ac;
+  | _, `Poly { contents = `Preunify _ } -> unify ~ex ~ac:(instantiate ac)
+  | `Poly { contents = `Unify ex }, _ -> unify ~ex ~ac
+  | _, `Poly { contents = `Unify ac } -> unify ~ex ~ac
 
   | `Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
   | _, `Prim { prim_type } -> unify ~ex ~ac:prim_type

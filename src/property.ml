@@ -9,7 +9,7 @@ type map = t list String.Map.t
 
 let shared : map ref = ref String.Map.empty
 
-let add target ~name ~ty =
+let add target ~name ~(ty:Type.t) =
   shared := String.Map.add_multi !shared ~key:name ~data:{ target; ty }
 
 let add_method target ~name ~spec =
