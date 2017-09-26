@@ -148,7 +148,7 @@ let instantiate (ty:Type.t) =
   | `Poly (tyvars, ty') ->
     let env = List.map tyvars
         ~f:(fun tyvar ->
-            (tyvar, create_metavar_opt ty.loc)) in
+            (tyvar, create_metavar ty.loc)) in
     subst ty' env
   | _ -> ty
 
@@ -294,7 +294,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
 
       | `List es ->
         begin match es with
-          | [] -> (env, desc_list @@ create_metavar loc)
+          | [] -> (env, desc_list @@ create_metavar_some loc)
           | e :: es ->
             let base_ty = easy_infer clos env e in
             List.iter es ~f:(fun e ->
@@ -313,7 +313,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
 
       | `Fundef fdef ->
         let params = List.map fdef.fdef_params
-            ~f:(fun param -> Type.create_metavar_opt param.loc)
+            ~f:(fun param -> Type.create_metavar param.loc)
         in
 
         (* TODO: return type declaration *)
@@ -374,7 +374,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
 
         end else begin
           let args = List.map call.fc_args ~f:(fun e -> easy_infer clos env e) in
-          let ret = Type.create_metavar loc in
+          let ret = Type.create_metavar_some loc in
           let ac_fun = Type.create (Some loc) (desc_fun args ret) in
           unify ~ex:ex_fun ~ac:ac_fun;
           Printf.printf "# end funcall infer\n";
@@ -383,7 +383,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
 
       | `Switch sw ->
         let match_ty = easy_infer clos env sw.sw_val in
-        let val_ty = Type.create_metavar loc in
+        let val_ty = Type.create_metavar_some loc in
         List.iter sw.sw_cls ~f:(fun cls ->
             infer_sw_cls clos env match_ty val_ty cls);
         (env, val_ty.desc)
@@ -554,11 +554,11 @@ and infer_ptn clos env (ptn:Ast.pattern) =
   | `String _ -> (env, Type.string)
 
   | `Var name ->
-    let ty = Type.create_metavar_opt name.loc in
+    let ty = Type.create_metavar name.loc in
     (Env.add env ~key:name.desc ~data:(Module.value_attr ty), ty)
 
   | `List elts ->
-    let ty = Type.create_metavar @@ Ast.location ptn.ptn_cls in
+    let ty = Type.create_metavar_some @@ Ast.location ptn.ptn_cls in
     let env = List.fold_left elts
         ~init:env
         ~f:(fun env elt ->

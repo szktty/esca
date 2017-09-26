@@ -46,10 +46,10 @@ let create loc desc =
   Located.create loc desc
 
 let create_metavar loc =
-  Located.create (Some loc) (`Meta (ref None))
+  Located.create loc (`Meta (ref None))
 
-let create_metavar_opt loc =
-  create_metavar @@ Option.value_exn loc
+let create_metavar_some loc =
+  create_metavar (Some loc)
 
 let var_names = [|
   "a"; "b"; "c"; "d"; "e"; "f"; "g"; "h"; "i"; "j"; "k"; "l"; "m"; "n";
