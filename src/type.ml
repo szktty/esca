@@ -3,12 +3,18 @@ open Core.Std
 type t = desc Located.t
 
 and desc = [
-  | `App of tycon * t list
+  | `App of app
   | `Var of tyvar
   | `Poly of [ `Preunify of tyvar list * t | `Unify of t ] ref
   | `Prim of primitive
   | `Meta of metavar
 ]
+
+and app = {
+  tycon : tycon;
+  args : t list;
+  path : string Namepath.t option;
+}
 
 and tycon = [
   | `Void
@@ -61,7 +67,7 @@ let equal (ty1:t) (ty2:t) =
 
 let rec to_string (ty:t) =
   match ty.desc with
-  | `App (tycon, args) ->
+  | `App { tycon; args } ->
     let tycon_s = match tycon with
       | `Void -> "Void"
       | `Bool -> "Bool"
@@ -107,8 +113,10 @@ let rec unwrap (ty:t) =
 
 let rec fun_params (ty:t) =
   match (unwrap ty).desc with
-  | `App (`Fun, args) -> List.rev args |> List.tl_exn |> List.rev
-  | `Prim { prim_type } -> fun_params prim_type
+  | `App { tycon = `Fun; args } ->
+    List.rev args |> List.tl_exn |> List.rev
+  | `Prim { prim_type } ->
+    fun_params prim_type
   | _ -> failwith "not function"
 
 let rec fun_return (ty:t) =
@@ -116,14 +124,14 @@ let rec fun_return (ty:t) =
   | `Meta { contents = Some ty }
   | `Poly { contents = `Preunify (_, ty) } -> fun_return ty
   | `Poly { contents = `Unify ty } -> fun_return ty
-  | `App (`Fun, args) 
-  | `App (`Method _, args) -> List.last_exn args
+  | `App { tycon = `Fun; args }
+  | `App { tycon = `Method _; args } -> List.last_exn args
   | `Prim { prim_type } -> fun_return prim_type
   | _ -> failwith @@ Printf.sprintf "not function %s" (to_string ty)
 
 let module_name (ty:t) =
   match (unwrap ty).desc with
-  | `App (`Module name, _) -> Some name
+  | `App { tycon = `Module name } -> Some name
   | _ -> None
 
 let prim_id (ty:t) =
@@ -142,7 +150,7 @@ let tyvar_d = tyvar "d"
 
 let poly tyvars (ty:t) : desc = `Poly (ref (`Preunify (tyvars, ty)))
 
-let app ?(args=[]) tycon = `App (tycon, args)
+let app ?(args=[]) ?path tycon = `App { tycon; args; path }
 let desc_void = app `Void
 let desc_bool = app `Bool
 let desc_int = app `Int
@@ -178,7 +186,8 @@ let fun_to_method (f:t) : t =
   let rec to_method (ty:t) =
     match ty.desc with
     | `Meta { contents = Some ty } -> to_method ty
-    | `App (`Fun, recv :: args) -> `App (`Method recv, args)
+    | `App { tycon = `Fun; args = recv :: args; path } ->
+      `App { tycon = `Method recv; args; path }
     | `Poly { contents = `Preunify (tyvars, ty) } ->
       `Poly (ref (`Preunify (tyvars, (Located.create ty.loc (to_method ty)))))
     | `Poly { contents = `Unify ty } -> to_method ty
@@ -289,7 +298,9 @@ module Spec = struct
                 let tyvars', arg' = f tyvars arg in
                 tyvars', Located.less arg' :: args)
         in
-        tyvars', `App (`Fun, List.rev args')
+        tyvars', `App { tycon = `Fun;
+                        args = List.rev args';
+                        path = None }
       | _ -> failwith "not yet support"
     in
     f [] spec
