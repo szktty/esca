@@ -373,6 +373,7 @@ module Program = struct
     let params =
       List.map func.fdef_params
         ~f:(fun var ->
+            Printf.printf "write_fun: param %s\n" var.id;
             sprintf "%s %s" var.id (Raw_type.to_string var.ty))
       |> String.concat ~sep:", "
     in
@@ -515,6 +516,7 @@ module Compiler = struct
                 ~ty:(Raw_type.of_type var.ty)
                 ~name:var.id
             in
+            Printf.printf"#    param %s for %s\n" param.id var.id;
             ctx, param :: params)
     in
     let params = List.rev rev_params in
@@ -655,6 +657,7 @@ module Compiler = struct
 
     | Ref_var var ->
       Printf.printf "LIR: compile ref var: %s\n" var.id;
+      Printf.printf "   find %s for %s\n" (get_local_exn ctx var.id).id var.id;
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Ref_var {
             ref_var_from = get_local_exn ctx var.id;

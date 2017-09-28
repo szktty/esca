@@ -218,14 +218,17 @@ module Context = struct
     { ctx with vars = var :: ctx.vars }
 
   let new_var ?name ctx ty =
+    Printf.printf "# new_var %d\n" ctx.id;
     let ctx, id = gen_id ctx in
     let var = { Var.id = id; ty = ty } in
     let ctx = match name with
       | None -> ctx
-      | Some name -> { ctx with
-                       var_map = String.Map.add ctx.var_map
-                           ~key:name
-                           ~data:var }
+      | Some name ->
+        Printf.printf "    name: %s\n" name;
+        { ctx with
+          var_map = String.Map.add ctx.var_map
+              ~key:name
+              ~data:var }
     in
     { ctx with vars = var :: ctx.vars }, var
 
@@ -295,6 +298,7 @@ module Compiler = struct
           ~init:(fun_ctx, [])
           ~f:(fun (ctx, vars) name ty ->
               let ctx, var = new_var ctx ty ~name:name.desc in
+              Printf.printf "new param: %s -> %s\n" name.desc var.id;
               ctx, var :: vars)
       in
       let params = List.rev rev_params in
@@ -416,7 +420,9 @@ module Compiler = struct
           | None ->
             begin match get_var ctx name with
               | None -> ctx, Ref_fun { Var.id = name; ty }
-              | Some var -> ctx, Ref_var var
+              | Some var ->
+                Printf.printf "get_var %s\n" var.id;
+                ctx, Ref_var var
             end
           | Some prefix ->
             Printf.printf "HIR: property '%s'\n" name;
