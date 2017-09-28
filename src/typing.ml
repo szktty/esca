@@ -245,7 +245,11 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | _, _ ->
     raise (Unify_error { uniexn_ex = ex; uniexn_ac = ac })
 
-let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
+let owner = ref (Module.create "dummy")
+
+let rec infer (e:Ast.t) 
+    ~(clos:Closure.t)
+    ~(env:Env.t) : (Env.t * Type.t) =
   Printf.printf "infer e: ";
   Ast.print e;
   let loc = Ast.location e in
@@ -256,14 +260,14 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
       | `Chunk chunk -> 
         let env = List.fold_left chunk.ch_stats
             ~init:env
-            ~f:(fun env e -> fst @@ infer clos env e)
+            ~f:(fun env e -> fst @@ infer e ~clos ~env)
         in
         (env, desc_void)
 
       | `Return e ->
         let ty = Option.value_map e
             ~default:Type.void
-            ~f:(fun e -> easy_infer clos env e)
+            ~f:(fun e -> easy_infer e ~clos ~env)
         in
         begin match clos.ret_ty with
           | None -> clos.ret_ty <- Some ty
@@ -274,23 +278,23 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
       | `If if_ -> 
         let unify_action block =
           List.iter block ~f:(fun stat ->
-              unify ~ex:Type.void ~ac:(easy_infer clos env stat))
+              unify ~ex:Type.void ~ac:(easy_infer stat ~clos ~env))
         in
 
         List.iter if_.if_actions
           ~f:(fun (cond, block) ->
-              unify ~ex:Type.bool ~ac:(easy_infer clos env cond);
+              unify ~ex:Type.bool ~ac:(easy_infer cond ~clos ~env);
               unify_action block);
         unify_action if_.if_else;
         (env, desc_void)
 
       | `For for_ ->
-        let range_ty = easy_infer clos env for_.for_range in
-        unify ~ex:Type.range ~ac:(easy_infer clos env for_.for_range);
+        let range_ty = easy_infer for_.for_range ~clos ~env in
+        unify ~ex:Type.range ~ac:(easy_infer ~clos ~env for_.for_range);
         let env = Env.add env
             ~key:for_.for_var.desc
             ~data:(Module.value_attr Type.int) in
-        let _, block_ty = infer_block clos env for_.for_block in
+        let _, block_ty = infer_block ~clos ~env for_.for_block in
         unify ~ex:Type.void ~ac:block_ty;
         (env, Type.void.desc)
 
@@ -305,18 +309,18 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
         begin match es with
           | [] -> (env, desc_list @@ create_metavar_some loc)
           | e :: es ->
-            let base_ty = easy_infer clos env e in
+            let base_ty = easy_infer ~clos ~env e in
             List.iter es ~f:(fun e ->
-                unify ~ex:base_ty ~ac:(easy_infer clos env e));
+                unify ~ex:base_ty ~ac:(easy_infer ~clos ~env e));
             (env, desc_list @@ base_ty)
         end
 
       | `Tuple es ->
-        (env, desc_tuple (List.map es ~f:(fun e -> easy_infer clos env e)))
+        (env, desc_tuple (List.map es ~f:(fun e -> easy_infer ~clos ~env e)))
 
       | `Vardef vdef ->
-        let exp_ty = easy_infer clos env vdef.vdef_exp in
-        let env, ptn_ty = infer_ptn clos env vdef.vdef_ptn in
+        let exp_ty = easy_infer ~clos ~env vdef.vdef_exp in
+        let env, ptn_ty = infer_ptn ~clos ~env vdef.vdef_ptn in
         unify ~ex:ptn_ty ~ac:exp_ty;
         (env, ptn_ty.desc)
 
@@ -349,7 +353,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
                    ~key:name.desc
                    ~data:(Module.value_attr ty))
         in
-        let _, ret' = infer_block clos' fenv fdef.fdef_block in
+        let _, ret' = infer_block fdef.fdef_block ~clos:clos' ~env:fenv in
         (*unify ~ex:ret ~ac:ret';*)
         let clos_ret = Option.value clos'.ret_ty ~default:Type.void in
         unify ~ex:ret ~ac:clos_ret;
@@ -358,7 +362,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
       | `Funcall call ->
         Printf.printf "# funcall ";
         Ast.print e;
-        let ex_fun = easy_infer clos env call.fc_fun in
+        let ex_fun = easy_infer ~clos ~env call.fc_fun in
         call.fc_fun_type <- Some ex_fun;
         Printf.printf "# funcall infer ex: %s\n" (Type.to_string ex_fun);
 
@@ -369,7 +373,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
           | fmt_s :: args ->
             match fmt_s with
             | `String fmt_s ->
-              let args = List.map args ~f:(fun e -> easy_infer clos env e) in
+              let args = List.map args ~f:(fun e -> easy_infer ~clos ~env e) in
               let params = Type.parse_format fmt_s.desc in
               if List.length args <> List.length params then
                 failwith "numbers of printf arguments are not matched"
@@ -382,7 +386,7 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
             | _ -> (env, Type.desc_void)
 
         end else begin
-          let args = List.map call.fc_args ~f:(fun e -> easy_infer clos env e) in
+          let args = List.map call.fc_args ~f:(fun e -> easy_infer ~clos ~env e) in
           let ret = Type.create_metavar_some loc in
           let ac_fun = Type.create (Some loc) (desc_fun args ret) in
           unify ~ex:ex_fun ~ac:ac_fun;
@@ -391,17 +395,17 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
         end
 
       | `Switch sw ->
-        let match_ty = easy_infer clos env sw.sw_val in
+        let match_ty = easy_infer ~clos ~env sw.sw_val in
         let val_ty = Type.create_metavar_some loc in
         List.iter sw.sw_cls ~f:(fun cls ->
-            infer_sw_cls clos env match_ty val_ty cls);
+            infer_sw_cls ~clos ~env match_ty val_ty cls);
         (env, val_ty.desc)
 
       | `Var var ->
         let name = var.var_name.desc in
         let ty = match Ast.(var.var_prefix) with
           | Some prefix ->
-            let ty = easy_infer clos env prefix in
+            let ty = easy_infer ~clos ~env prefix in
             begin match (Type.unwrap ty).desc with
               | `App (`Module mname, _) ->
                 begin match Library.find_module mname with
@@ -431,13 +435,13 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
           | `Fpos | `Fneg -> (Type.float, Type.float)
           | _ -> failwith "not yet supported"
         in
-        unify ~ex:op_ty ~ac:(easy_infer clos env e);
+        unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e);
         (env, val_ty.desc)
 
       | `Binexp { binexp_left = e1; binexp_op = op; binexp_right = e2 } ->
         let op_ty, val_ty = match op.desc with
           | `Eq | `Ne ->
-            (easy_infer clos env e1, Type.bool)
+            (easy_infer ~clos ~env e1, Type.bool)
           | `And | `Or ->
             (Type.bool, Type.bool)
           | `Lt | `Le | `Gt | `Ge ->
@@ -449,35 +453,35 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
             (Type.float, Type.float)
           | _ -> failwith "not yet supported"
         in
-        unify ~ex:op_ty ~ac:(easy_infer clos env e1);
-        unify ~ex:op_ty ~ac:(easy_infer clos env e2);
+        unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e1);
+        unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e2);
         (env, val_ty.desc)
 
                 (*
     | Not(e) ->
-      unify `Bool (infer clos env e);
+      unify `Bool (infer ~clos ~env e);
       `Bool
     | Neg(e) ->
-      unify `Int (infer clos env e);
+      unify `Int (infer ~clos ~env e);
       `Int
     | FNeg(e) ->
-      unify `Float (infer clos env e);
+      unify `Float (infer ~clos ~env e);
       `Float
     | FAdd(e1, e2) | FSub(e1, e2) | FMul(e1, e2) | FDiv(e1, e2) ->
-      unify `Float (infer clos env e1);
-      unify `Float (infer clos env e2);
+      unify `Float (infer ~clos ~env e1);
+      unify `Float (infer ~clos ~env e2);
       `Float
     | Eq(e1, e2) | LE(e1, e2) ->
-      unify (infer clos env e1) (infer env e2);
+      unify (infer ~clos ~env e1) (infer env e2);
       `Bool
     | If(e1, e2, e3) ->
-      unify (infer clos env e1) `Bool;
-      let t2 = infer clos env e2 in
-      let t3 = infer clos env e3 in
+      unify (infer ~clos ~env e1) `Bool;
+      let t2 = infer ~clos ~env e2 in
+      let t3 = infer ~clos ~env e3 in
       unify t2 t3;
       t2
     | Let((x, t), e1, e2) -> (* let¤Î·¿¿äÏÀ (caml2html: typing_let) *)
-      unify t (infer clos env e1);
+      unify t (infer ~clos ~env e1);
       g (M.add x t env) e2
     | Var(x) when M.mem x env -> M.find x env (* ÊÑ¿ô¤Î·¿¿äÏÀ (caml2html: typing_var) *)
     | Var(x) when M.mem x !extenv -> M.find x !extenv
@@ -489,27 +493,27 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
     | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let rec¤Î·¿¿äÏÀ (caml2html: typing_letrec) *)
       let env = M.add x t env in
       unify t (`Fun(List.map snd yts, g (M.add_list yts env) e1));
-      infer clos env e2
+      infer ~clos ~env e2
     | App(e, es) -> (* ´Ø¿ôÅ¬ÍÑ¤Î·¿¿äÏÀ (caml2html: typing_app) *)
       let t = `gentyp () in
-      unify (infer clos env e) (`Fun(List.map (infer env) es, t));
+      unify (infer ~clos ~env e) (`Fun(List.map (infer env) es, t));
       t
-    | Tuple(es) -> `Tuple(List.map (infer clos env) es)
+    | Tuple(es) -> `Tuple(List.map (infer ~clos ~env) es)
     | LetTuple(xts, e1, e2) ->
-      unify (`Tuple(List.map snd xts)) (infer clos env e1);
+      unify (`Tuple(List.map snd xts)) (infer ~clos ~env e1);
       g (M.add_list xts env) e2
     | Array(e1, e2) -> (* must be a primitive for "polymorphic" typing *)
-      unify (infer clos env e1) `Int;
-      `Array(infer clos env e2)
+      unify (infer ~clos ~env e1) `Int;
+      `Array(infer ~clos ~env e2)
     | Get(e1, e2) ->
       let t = `gentyp () in
-      unify (`Array(t)) (infer clos env e1);
-      unify `Int (infer clos env e2);
+      unify (`Array(t)) (infer ~clos ~env e1);
+      unify `Int (infer ~clos ~env e2);
       t
     | Put(e1, e2, e3) ->
-      let t = infer clos env e3 in
-      unify (`Array(t)) (infer clos env e1);
-      unify `Int (infer clos env e2);
+      let t = infer ~clos ~env e3 in
+      unify (`Array(t)) (infer ~clos ~env e1);
+      unify `Int (infer ~clos ~env e2);
       `Void
        *)
       | _ -> Ast.print e; failwith "TODO"
@@ -527,20 +531,21 @@ let rec infer (clos:Closure.t) env (e:Ast.t) : (Env.t * Type.t) =
       mismatch_ac = generalize ac;
     }
 
-and easy_infer clos env (e:Ast.t) : Type.t = snd @@ infer clos env e
+and easy_infer (e:Ast.t) ~clos ~env : Type.t =
+  snd @@ infer e ~clos ~env
 
-and infer_block clos env es =
+and infer_block es ~clos ~env =
   List.fold_left es ~init:(env, Type.void)
-    ~f:(fun (env, _) e -> infer clos env e)
+    ~f:(fun (env, _) e -> infer e ~clos ~env)
 
-and infer_sw_cls clos env match_ty val_ty (cls:Ast.switch_cls) =
+and infer_sw_cls ~clos ~env match_ty val_ty (cls:Ast.switch_cls) =
   (* pattern *)
-  let env, ptn_ty = infer_ptn clos env cls.sw_cls_ptn in
+  let env, ptn_ty = infer_ptn ~clos ~env cls.sw_cls_ptn in
   unify ~ex:match_ty ~ac:ptn_ty;
 
   (* guard *)
   Option.iter cls.sw_cls_guard ~f:(fun guard ->
-      unify ~ex:Type.bool ~ac:(easy_infer clos env guard));
+      unify ~ex:Type.bool ~ac:(easy_infer ~clos ~env guard));
 
   (* var *)
   let env = Option.value_map cls.sw_cls_var
@@ -551,10 +556,10 @@ and infer_sw_cls clos env match_ty val_ty (cls:Ast.switch_cls) =
   in
 
   (* action *)
-  let _, action_ty = infer_block clos env cls.sw_cls_action in
+  let _, action_ty = infer_block ~clos ~env cls.sw_cls_action in
   unify ~ex:val_ty ~ac:action_ty
 
-and infer_ptn clos env (ptn:Ast.pattern) =
+and infer_ptn ~clos ~env (ptn:Ast.pattern) =
   match ptn.ptn_cls with
   | `Nop _ | `Void _ -> (env, Type.void)
   | `Bool _ -> (env, Type.bool)
@@ -571,7 +576,7 @@ and infer_ptn clos env (ptn:Ast.pattern) =
     let env = List.fold_left elts
         ~init:env
         ~f:(fun env elt ->
-            let env, elt_ty = infer_ptn clos env elt in
+            let env, elt_ty = infer_ptn ~clos ~env elt in
             unify ~ex:ty ~ac:elt_ty;
             env)
     in
@@ -581,14 +586,18 @@ and infer_ptn clos env (ptn:Ast.pattern) =
     let env, rev_tys = List.fold_left elts
         ~init:(env, [])
         ~f:(fun (env, accu) elt ->
-            let env, elt_ty = infer_ptn clos env elt in
+            let env, elt_ty = infer_ptn ~clos ~env elt in
             (env, elt_ty :: accu))
     in
     (env, Type.tuple (List.rev rev_tys))
 
   | _ -> failwith "notimpl"
 
-let run (e:Ast.t) =
+let run mod_ (node:Ast.t) : Module.t =
   verbose "begin typing";
-  ignore @@ infer (Closure.create ()) (Library.root_env ()) e;
-  verbose "end typing"
+  owner := mod_;
+  ignore @@ infer node
+    ~clos:(Closure.create ())
+    ~env:(Library.root_env ());
+  verbose "end typing";
+  !owner

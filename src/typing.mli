@@ -15,4 +15,4 @@ exception Type_mismatch of mismatch
 
 exception Deref_error of Type.t * string
 
-val run : Ast.t -> unit
+val run : Module.t -> Ast.t -> Module.t
