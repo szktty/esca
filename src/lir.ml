@@ -75,6 +75,7 @@ module Op = struct
     | Terminal
     | Var of var
     | Ref of ref_
+    | Poly of poly
     | Ref_fun of ref_fun
     | Ref_prop of ref_prop
     | Prim of primitive
@@ -126,6 +127,12 @@ module Op = struct
     var_to : Register.t;
   }
 
+  and poly = {
+    poly_path : string Namepath.t;
+    poly_box : string;
+    poly_to : Register.t
+  }
+
   and ref_prop = {
     ref_prop_from : Register.t;
     ref_prop_to : Register.t;
@@ -166,6 +173,12 @@ end
 
 module Program = struct
 
+  type poly = {
+    poly_path : string Namepath.t;
+    poly_type : Raw_type.t;
+    poly_box : string;
+  }
+
   type t = {
     src : string;
     out : string;
@@ -173,6 +186,7 @@ module Program = struct
     vars : string list; (* TODO: var type *)
     funs : Op.fundef list;
     main : string option;
+    polys : poly list;
   }
 
   let basic_pkgs = [
@@ -180,8 +194,8 @@ module Program = struct
     "lib/kernel";
   ]
 
-  let create ~src ~out ~pkg ~vars ~funs ~main =
-    { src; out; pkg; vars; funs; main }
+  let create ~src ~out ~pkg ~vars ~funs ~main ~polys =
+    { src; out; pkg; vars; funs; main; polys }
 
   let ext = ".go"
 
@@ -197,6 +211,8 @@ module Program = struct
     let buf = Buffer.create 16 in
     write_pkg buf prog;
     write_import buf prog;
+    Printf.printf "polys: %d\n" (List.length prog.polys);
+    List.iter prog.polys ~f:(write_poly buf);
     List.iter prog.funs ~f:(write_fun buf);
     write_main buf prog;
     let code = contents buf in
@@ -219,6 +235,37 @@ module Program = struct
       ~f:(fun pkg ->
           add_string buf @@ sprintf "\"%s/%s\"\n" !Config.runlib_path pkg);
     add_string buf ")\n\n"
+
+  and write_poly buf (poly:poly) =
+    let open Buffer in
+    add_string buf @@ sprintf "func %s" poly.poly_box;
+
+    begin match poly.poly_type with
+      | Fun (args, ret) ->
+        let _, rev_args =
+          List.fold_left args ~init:(0, [])
+            ~f:(fun (id, temps) ty ->
+                let temp = sprintf "t%d %s" id (Raw_type.to_string ty) in
+                id + 1, temp :: temps) in
+        let args = List.rev rev_args in
+        add_string buf @@ sprintf "(%s) %s {\n"
+          (String.concat ~sep:", " args)
+          (Raw_type.to_string ret);
+
+        (* call function *)
+        let _, rev_call_args =
+          List.fold_left args ~init:(0, [])
+            ~f:(fun (id, temps) _ ->
+                let temp = sprintf "t%d" id in
+                id + 1, temp :: temps) in
+        let call_args = List.rev rev_call_args in
+        add_string buf @@ sprintf "return %s(%s)\n"
+          (Go.Name.value_path poly.poly_path)
+          (String.concat ~sep:", " call_args);
+        add_string buf "}\n\n"
+
+      | _ -> failwith "not function"
+    end
 
   and write_main buf prog =
     let open Buffer in
@@ -429,6 +476,7 @@ module Context = struct
     flag : Register.id;
     labels : Op.label list;
     main : Register.t option; (* TODO: unused? *)
+    polys : Program.poly list;
   }
 
   let create src =
@@ -442,6 +490,7 @@ module Context = struct
       flag = "fr";
       labels = [];
       main = None;
+      polys = [];
     }
 
   let add_local_map ctx name reg =
@@ -477,6 +526,12 @@ module Context = struct
     let n = List.length ctx.labels in
     let label = Printf.sprintf "L%d" n in
     { ctx with labels = label :: ctx.labels }, label
+
+  let add_poly ctx (path:string Namepath.t) (ty:Raw_type.t) =
+    let n = List.length ctx.polys in
+    let box = Printf.sprintf "__EscaPoly_%d" n in
+    let poly = { Program.poly_path = path; poly_box = box; poly_type = ty } in
+    { ctx with polys = poly :: ctx.polys }, box
 
   let add_op ctx op =
     { ctx with ops = op :: ctx.ops }
@@ -544,10 +599,11 @@ module Compiler = struct
                  fdef_params = params;
                  fdef_locals = Register.locals clos_ctx.locals;
                  fdef_body = clos_ctx.ops } in
-    ctx, fdef
+    { ctx with polys = List.append ctx.polys clos_ctx.polys }, fdef
 
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : Context.t =
     let open Context in
+    Printf.printf "LIR: poly %d\n" (List.length ctx.polys);
     match op with
 
     | Switch sw ->
@@ -599,6 +655,7 @@ module Compiler = struct
     | Call call ->
       Printf.printf "LIR: compile call\n";
       let ctx = compile_op ctx call.call_fun in
+      Printf.printf "LIR: poly %d\n" (List.length ctx.polys);
       let fun_reg = ctx.rc in
       Printf.printf "LIR: call fun %s\n" fun_reg.id;
       let ctx, arg_regs = compile_exps ctx call.call_args in
@@ -642,6 +699,7 @@ module Compiler = struct
       end
 
     | Prim prim ->
+      Printf.printf "LIR: compile prim: %s\n" prim.prim_id;
       let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_type) in
       add_op ctx @@ Prim {
         prim_rc = reg;
@@ -661,6 +719,16 @@ module Compiler = struct
         ~f:(fun reg -> Ref {
             ref_path = Var.path var;
             ref_to = reg })
+
+    | Poly fn ->
+      Printf.printf "LIR: compile poly: %s\n" (Namepath.to_string fn.poly_path);
+      let raw_ty = Raw_type.of_type fn.poly_type in
+      let ctx, box = add_poly ctx fn.poly_path raw_ty in
+      add_var_op ctx raw_ty 
+        ~f:(fun reg -> Poly {
+            poly_path = fn.poly_path;
+            poly_box = box;
+            poly_to = reg })
 
     | Ref_fun var ->
       Printf.printf "LIR: compile ref fun: %s\n" var.name;
@@ -683,6 +751,7 @@ module Compiler = struct
             ref_prop_to = reg })
 
     | Int value ->
+      Printf.printf "LIR: compile int\n";
       add_var_op ctx Raw_type.Int
         ~f:(fun reg -> Int (reg, value))
 
@@ -733,6 +802,7 @@ module Compiler = struct
         ~pkg:None
         ~vars:[]
         ~funs
+        ~polys:ctx.polys
         ~main:(Option.map ctx.main ~f:(fun reg -> reg.id))
     in
     Program.write prog

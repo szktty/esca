@@ -43,6 +43,7 @@ module Op = struct
     | Binexp of binexp
     | Var of Id.t
     | Ref of Var.t
+    | Poly of poly
     | Ref_fun of Id.t
     | Ref_prop of ref_prop
     | Prim of primitive
@@ -133,6 +134,11 @@ module Op = struct
   and primitive = {
     prim_id : string;
     prim_type : Type.t;
+  }
+
+  and poly = {
+    poly_path : string Namepath.t;
+    poly_type : Type.t
   }
 
   and ref_prop = {
@@ -411,6 +417,13 @@ module Compiler = struct
 
       let desc = Option.value_exn var.var_var in
       begin match desc with
+        | { scope = `Module path;
+            type_ = { desc = `Poly { contents = `Unify ty } };
+            name } ->
+          ctx, Poly {
+            poly_path = Namepath.create name ~prefix:(Some path);
+            poly_type = ty }
+
         | { scope = `Module _ } ->
           ctx, Ref desc
         | _ ->
