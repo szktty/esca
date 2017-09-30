@@ -408,10 +408,11 @@ module Compiler = struct
       Option.iter var.var_var
         ~f:(fun var ->
             Printf.printf "HIR: var = %s\n" (Var.to_string var));
-      (* TODO: var.var_var must not be None *)
-      begin match var.var_var with
-        | Some ({ scope = `Module _ } as var) ->
-          ctx, Ref var
+
+      let desc = Option.value_exn var.var_var in
+      begin match desc with
+        | { scope = `Module _ } ->
+          ctx, Ref desc
         | _ ->
           let ty = Type.unwrap @@ Option.value_exn var.var_type in
           begin match Type.prim_id ty with
