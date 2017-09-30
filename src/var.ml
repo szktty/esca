@@ -4,7 +4,7 @@ type t = {
   name : string;
   kind : [`Type | `Value];
   type_ : Type.t;
-  scope : [`Attr of string Namepath.t | `Local];
+  scope : [`Module of string Namepath.t | `Local];
 }
 
 type _t = t
@@ -18,10 +18,12 @@ module Map = struct
   let add vars var =
     String.Map.add vars ~key:var.name ~data:var
 
+  let map = String.Map.map
+
 end
 
 let attr name ~kind ~type_ ~path =
-  { name; kind; type_; scope = `Attr path }
+  { name; kind; type_; scope = `Module path }
 
 let local name ~kind ~type_ =
   { name; kind; type_; scope = `Local }
@@ -39,6 +41,6 @@ let to_string var =
     (Type.to_string var.type_)
     begin match var.scope with
       | `Local -> "Local"
-      | `Attr path ->
-        Printf.sprintf "Attr(%s)" (Namepath.to_string path)
+      | `Module path ->
+        Printf.sprintf "Module(%s)" (Namepath.to_string path)
     end

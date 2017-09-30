@@ -68,7 +68,9 @@ module Spec = struct
   let end_ spec =
     (* TODO: parent *)
     Printf.printf "# add module %s\n" spec.mod_name;
-    let m = Module.create spec.mod_name ~attrs:spec.attrs in
+    let attrs = Var.Map.map spec.attrs ~f:(fun attr ->
+        { attr with scope = `Module (Namepath.create spec.mod_name) }) in
+    let m = Module.create spec.mod_name ~attrs in
     top_modules := m :: !top_modules;
     if spec.init then begin
       top_imports := m :: !top_imports;
