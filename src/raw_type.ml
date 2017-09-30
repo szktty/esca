@@ -27,13 +27,15 @@ let rec of_type (ty:Type.t) : t =
       | None -> failwith "must not be none"
       | Some ty -> of_type ty
     end
-  | `App (`Void, []) -> Void
-  | `App (`Bool, []) -> Bool
-  | `App (`Int, []) -> Int
-  | `App (`Float, []) -> Float32
-  | `App (`String, []) -> String
-  | `App (`Fun, args)
-  | `App (`Method _, args) ->
+
+  | `App { tycon = `Void; args = [] } -> Void
+  | `App { tycon = `Bool; args = [] } -> Bool
+  | `App { tycon = `Int; args = [] } -> Int
+  | `App { tycon = `Float; args = [] } -> Float32
+  | `App { tycon = `String; args = [] } -> String
+
+  | `App { tycon = `Fun; args }
+  | `App { tycon = `Method _; args } ->
     let rec collect args accu =
       match args with
       | [] -> failwith "error"

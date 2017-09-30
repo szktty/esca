@@ -67,7 +67,7 @@ let equal (ty1:t) (ty2:t) =
 
 let rec to_string (ty:t) =
   match ty.desc with
-  | `App { tycon; args } ->
+  | `App { tycon; args; path } ->
     let tycon_s = match tycon with
       | `Void -> "Void"
       | `Bool -> "Bool"
@@ -90,7 +90,11 @@ let rec to_string (ty:t) =
       List.map args ~f:to_string
       |> String.concat ~sep:", "
     in
-    Printf.sprintf "App(%s, [%s])" tycon_s args_s
+    Printf.sprintf "App(%s, [%s]%s)" tycon_s args_s
+      (Option.value_map path
+         ~default:""
+         ~f:(fun path -> ", " ^ Namepath.to_string path))
+
   | `Meta { contents = None } -> "Meta(?)"
   | `Meta { contents = Some ty } -> "Meta(" ^ to_string ty ^ ")"
   | `Var name -> "Var(" ^ name ^ ")"
