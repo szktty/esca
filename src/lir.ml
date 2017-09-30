@@ -74,6 +74,7 @@ module Op = struct
     | Block of t list
     | Terminal
     | Var of var
+    | Ref of ref_
     | Ref_fun of ref_fun
     | Ref_prop of ref_prop
     | Prim of primitive
@@ -108,6 +109,11 @@ module Op = struct
     fdef_params : Register.t list;
     fdef_locals : Register.t list;
     fdef_body : t list;
+  }
+
+  and ref_ = {
+    ref_path : string Namepath.t;
+    ref_to : Register.t;
   }
 
   and ref_fun = {
@@ -336,6 +342,10 @@ module Program = struct
 
     | Var var ->
       addln @@ sprintf "%s = %s" var.var_to.id var.var_from.id
+
+    | Ref ref ->
+      addln @@ sprintf "%s = %s" ref.ref_to.id
+        (Go.Name.value_path ref.ref_path)
 
     | Ref_fun ref ->
       addln @@ sprintf "%s = %s" ref.ref_fun_to.id ref.ref_fun_from
@@ -639,11 +649,18 @@ module Compiler = struct
       }
 
     | Var var ->
-      Printf.printf "LIR: compile ref var: %s\n" var.name;
+      Printf.printf "LIR: compile var: %s\n" var.name;
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Var {
             var_from = get_local_exn ctx var.name;
             var_to = reg })
+
+    | Ref var ->
+      Printf.printf "LIR: compile ref: %s\n" var.name;
+      add_var_op ctx (Raw_type.of_type var.type_)
+        ~f:(fun reg -> Ref {
+            ref_path = Var.path var;
+            ref_to = reg })
 
     | Ref_fun var ->
       Printf.printf "LIR: compile ref fun: %s\n" var.name;

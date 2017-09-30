@@ -42,6 +42,7 @@ module Op = struct
     | Methcall of method_call
     | Binexp of binexp
     | Var of Id.t
+    | Ref of Var.t
     | Ref_fun of Id.t
     | Ref_prop of ref_prop
     | Prim of primitive
@@ -407,23 +408,29 @@ module Compiler = struct
       Option.iter var.var_var
         ~f:(fun var ->
             Printf.printf "HIR: var = %s\n" (Var.to_string var));
-      let ty = Type.unwrap @@ Option.value_exn var.var_type in
-      begin match Type.prim_id ty with
-        | Some id ->
-          ctx, Prim { prim_id = id; prim_type = ty }
-        | None ->
-          match var.var_prefix with
-          | None ->
-            begin match get_var ctx name with
-              | None -> ctx, Ref_fun { Id.name; ty }
-              | Some var -> ctx, Var var
-            end
-          | Some prefix ->
-            Printf.printf "HIR: property '%s'\n" name;
-            let obj = compile_node' ctx prefix in
-            ctx, Ref_prop { ref_prop_obj = obj;
-                            ref_prop_name = name;
-                            ref_prop_ty = ty }
+      (* TODO: var.var_var must not be None *)
+      begin match var.var_var with
+        | Some ({ scope = `Module _ } as var) ->
+          ctx, Ref var
+        | _ ->
+          let ty = Type.unwrap @@ Option.value_exn var.var_type in
+          begin match Type.prim_id ty with
+            | Some id ->
+              ctx, Prim { prim_id = id; prim_type = ty }
+            | None ->
+              match var.var_prefix with
+              | None ->
+                begin match get_var ctx name with
+                  | None -> ctx, Ref_fun { Id.name; ty }
+                  | Some var -> ctx, Var var
+                end
+              | Some prefix ->
+                Printf.printf "HIR: property '%s'\n" name;
+                let obj = compile_node' ctx prefix in
+                ctx, Ref_prop { ref_prop_obj = obj;
+                                ref_prop_name = name;
+                                ref_prop_ty = ty }
+          end
       end
 
     | `Bool value -> ctx, Bool value.desc

@@ -31,6 +31,11 @@ let local name ~kind ~type_ =
 let local_value name ~type_ =
   local name ~kind:`Value ~type_
 
+let path var =
+  match var.scope with
+  | `Local -> Namepath.create var.name
+  | `Module mod_path -> Namepath.create var.name ~prefix:(Some mod_path)
+
 let to_string var =
   Printf.sprintf "Var(%s, %s, %s, %s)"
     var.name
