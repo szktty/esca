@@ -1,20 +1,11 @@
 open Core.Std
 
-type attr_kind = [`Type | `Value]
-
-type attr = {
-  attr_kind : attr_kind;
-  attr_type : Type.t;
-}
-
-type attr_map = attr String.Map.t
-
 type t = {
   parent : t option;
   name : string;
   mutable submodules : t list;
   mutable imports : t list;
-  mutable attrs : attr_map;
+  mutable attrs : Var.Map.t;
 }
 
 let create ?parent ?(submodules=[]) ?(imports=[]) ?attrs name =
@@ -64,14 +55,5 @@ let rec find_attr m key =
     | Some _ as v -> v
     | None -> None
 
-let add_attr m ~key ~data =
-  m.attrs <- String.Map.add m.attrs ~key ~data
-
-let attr kind ty =
-  { attr_kind = kind; attr_type = ty }
-
-let type_attr ty =
-  attr `Type ty
-
-let value_attr ty =
-  attr `Value ty
+let add_attr m attr =
+  m.attrs <- Var.Map.add m.attrs attr

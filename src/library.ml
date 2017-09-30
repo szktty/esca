@@ -40,23 +40,21 @@ module Spec = struct
     mod_name : string;
     init : bool;
     parent : string option;
-    attrs : Module.attr_map;
+    attrs : Var.Map.t;
   }
 
   let define ?parent ?(init=false) name =
-    { mod_name = name; init; parent; attrs = String.Map.empty }
+    { mod_name = name; init; parent; attrs = Var.Map.empty }
 
-  let (+>) spec (name, attr) =
-    { spec with attrs = String.Map.add spec.attrs
-                    ~key:name
-                    ~data:attr }
+  let (+>) spec attr =
+    { spec with attrs = Var.Map.add spec.attrs attr }
 
-  let typ name ty =
-    name, { Module.attr_kind = `Type; attr_type = ty }
+  let typ name type_ =
+    Var.local name ~kind:`Type ~type_
 
-  let value name ty = 
-    name, { Module.attr_kind = `Value;
-            attr_type = Type.prim "dummy" name ty } (* TODO: pkg, id *)
+  let value name type_ = 
+    (* TODO: primitive *)
+    Var.local name ~kind:`Value ~type_
 
   let int name =
     value name Type.int

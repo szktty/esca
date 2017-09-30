@@ -124,7 +124,8 @@ and sdef_field = {
 and var = {
   var_prefix : t option;
   var_name : text;
-  mutable var_type : Type.t option;
+  mutable var_type : Type.t option; (* TODO: deprecated *)
+  mutable var_var : Var.t option;
 }
 
 and if_ = {

@@ -2,12 +2,12 @@ open Core
 
 type t = {
   imports : Module.t list;
-  attrs : Module.attr_map;
+  attrs : Var.Map.t;
 }
 
 let create ?(imports=[]) ?attrs () =
   { imports;
-    attrs = Option.value attrs ~default:(String.Map.empty);
+    attrs = Option.value attrs ~default:Var.Map.empty;
   }
 
 let import env m =
@@ -19,8 +19,8 @@ let find env key =
   | None -> List.find_mapi env.imports
               ~f:(fun _ m -> Module.find_attr m key)
 
-let add env ~key ~data =
-  { env with attrs = String.Map.add env.attrs ~key ~data }
+let add env var =
+  { env with attrs = Var.Map.add env.attrs var }
 
 let concat env =
   let f attrs accu =
@@ -46,6 +46,6 @@ let debug env =
   printf "    }\n";
   printf "    attrs = {\n";
   String.Map.iteri env.attrs ~f:(fun ~key ~data ->
-      printf "        %s = %s\n" key (Type.to_string data.attr_type));
+      printf "        %s = %s\n" key (Type.to_string data.type_));
   printf "    }\n";
   printf "}\n"

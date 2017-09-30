@@ -54,8 +54,8 @@ and tyexp_desc =
     (* TODO: prefix *)
     match Env.find env path.name.desc with
     | None -> None
-    | Some attr -> match attr.attr_kind with
-      | `Type -> Some attr.attr_type
+    | Some attr -> match attr.kind with
+      | `Type -> Some attr.type_
       | _ -> failwith "not type"
 
   let to_type (env:Env.t) (node:Ast.tyexp) : Type.t option =
@@ -291,9 +291,8 @@ let rec infer (e:Ast.t)
       | `For for_ ->
         let range_ty = easy_infer for_.for_range ~clos ~env in
         unify ~ex:Type.range ~ac:(easy_infer ~clos ~env for_.for_range);
-        let env = Env.add env
-            ~key:for_.for_var.desc
-            ~data:(Module.value_attr Type.int) in
+        let var = Var.local for_.for_var.desc ~kind:`Value ~type_:Type.int in
+        let env = Env.add env var in
         let _, block_ty = infer_block ~clos ~env for_.for_block in
         unify ~ex:Type.void ~ac:block_ty;
         (env, Type.void.desc)
@@ -345,13 +344,13 @@ let rec infer (e:Ast.t)
         let fun_ty = Type.fun_ (Some loc) params ret in
         fdef.fdef_type <- Some fun_ty;
         (* for recursive call *)
-        let env = Env.add env
-            ~key:fdef.fdef_name.desc
-            ~data:(Module.value_attr fun_ty) in
+        let fun_var = Var.local fdef.fdef_name.desc
+            ~kind:`Value
+            ~type_:fun_ty in
+        let env = Env.add env fun_var in
         let fenv = List.fold2_exn fdef.fdef_params params ~init:env
-            ~f:(fun env name ty -> Env.add env
-                   ~key:name.desc
-                   ~data:(Module.value_attr ty))
+            ~f:(fun env name type_ ->
+                Env.add env (Var.local_value name.desc ~type_))
         in
         let _, ret' = infer_block fdef.fdef_block ~clos:clos' ~env:fenv in
         (*unify ~ex:ret ~ac:ret';*)
@@ -414,7 +413,7 @@ let rec infer (e:Ast.t)
                     let aname = var.var_name.desc in
                     match Module.find_attr m aname with
                     | None -> failwith ("module attribute is not found: " ^ aname)
-                    | Some attr -> attr.attr_type
+                    | Some attr -> attr.type_
                 end
               | _ ->
                 match Property.find ty name with
@@ -424,7 +423,7 @@ let rec infer (e:Ast.t)
           | None ->
             match Env.find env name with
             | None -> failwith ("variable is not found: " ^ name)
-            | Some attr -> attr.attr_type
+            | Some attr -> attr.type_
         in
         var.var_type <- Some ty;
         env, ty.desc
@@ -550,9 +549,7 @@ and infer_sw_cls ~clos ~env match_ty val_ty (cls:Ast.switch_cls) =
   (* var *)
   let env = Option.value_map cls.sw_cls_var
       ~default:env
-      ~f:(fun name -> Env.add env
-             ~key:name.desc
-             ~data:(Module.value_attr match_ty))
+      ~f:(fun name -> Env.add env (Var.local_value name.desc ~type_:match_ty))
   in
 
   (* action *)
@@ -569,7 +566,7 @@ and infer_ptn ~clos ~env (ptn:Ast.pattern) =
 
   | `Var name ->
     let ty = Type.create_metavar name.loc in
-    (Env.add env ~key:name.desc ~data:(Module.value_attr ty), ty)
+    Env.add env (Var.local_value name.desc ~type_:ty), ty
 
   | `List elts ->
     let ty = Type.create_metavar_some @@ Ast.location ptn.ptn_cls in
