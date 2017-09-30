@@ -73,9 +73,8 @@ module Op = struct
     | Binexp of binexp
     | Block of t list
     | Terminal
-    | Var of Register.t
+    | Var of var
     | Ref_fun of ref_fun
-    | Ref_var of ref_var
     | Ref_prop of ref_prop
     | Prim of primitive
     | Null
@@ -116,9 +115,9 @@ module Op = struct
     ref_fun_to : Register.t;
   }
 
-  and ref_var = {
-    ref_var_from : Register.t;
-    ref_var_to : Register.t;
+  and var = {
+    var_from : Register.t;
+    var_to : Register.t;
   }
 
   and ref_prop = {
@@ -335,11 +334,11 @@ module Program = struct
       let bridge = bridge_prim_id prim.prim_id in
       with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
 
+    | Var var ->
+      addln @@ sprintf "%s = %s" var.var_to.id var.var_from.id
+
     | Ref_fun ref ->
       addln @@ sprintf "%s = %s" ref.ref_fun_to.id ref.ref_fun_from
-
-    | Ref_var ref ->
-      addln @@ sprintf "%s = %s" ref.ref_var_to.id ref.ref_var_from.id
 
     | Ref_prop ref ->
       Printf.printf "write: ref_prop %s\n" (Raw_type.to_string ref.ref_prop_from.ty);
@@ -640,9 +639,11 @@ module Compiler = struct
       }
 
     | Var var ->
-      Printf.printf "LIR: compile var: %s\n" var.name;
+      Printf.printf "LIR: compile ref var: %s\n" var.name;
       add_var_op ctx (Raw_type.of_type var.ty)
-        ~f:(fun reg -> Var reg)
+        ~f:(fun reg -> Var {
+            var_from = get_local_exn ctx var.name;
+            var_to = reg })
 
     | Ref_fun var ->
       Printf.printf "LIR: compile ref fun: %s\n" var.name;
@@ -652,13 +653,6 @@ module Compiler = struct
             ref_fun_from = var.name;
             ref_fun_to = reg;
           })
-
-    | Ref_var var ->
-      Printf.printf "LIR: compile ref var: %s\n" var.name;
-      add_var_op ctx (Raw_type.of_type var.ty)
-        ~f:(fun reg -> Ref_var {
-            ref_var_from = get_local_exn ctx var.name;
-            ref_var_to = reg })
 
     | Ref_prop prop ->
       Printf.printf "LIR: compile ref prop: %s: %s\n"

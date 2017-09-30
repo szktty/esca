@@ -43,7 +43,6 @@ module Op = struct
     | Binexp of binexp
     | Var of Id.t
     | Ref_fun of Id.t
-    | Ref_var of Id.t
     | Ref_prop of ref_prop
     | Prim of primitive
     | Null
@@ -417,7 +416,7 @@ module Compiler = struct
           | None ->
             begin match get_var ctx name with
               | None -> ctx, Ref_fun { Id.name; ty }
-              | Some var -> ctx, Ref_var var
+              | Some var -> ctx, Var var
             end
           | Some prefix ->
             Printf.printf "HIR: property '%s'\n" name;
