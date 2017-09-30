@@ -413,7 +413,9 @@ let rec infer (e:Ast.t)
                     let aname = var.var_name.desc in
                     match Module.find_attr m aname with
                     | None -> failwith ("module attribute is not found: " ^ aname)
-                    | Some attr -> attr.type_
+                    | Some attr ->
+                      var.var_var <- Some attr;
+                      attr.type_
                 end
               | _ ->
                 match Property.find ty name with
@@ -423,7 +425,9 @@ let rec infer (e:Ast.t)
           | None ->
             match Env.find env name with
             | None -> failwith ("variable is not found: " ^ name)
-            | Some attr -> attr.type_
+            | Some attr ->
+              var.var_var <- Some attr;
+              attr.type_
         in
         var.var_type <- Some ty;
         env, ty.desc

@@ -504,7 +504,7 @@ end
 module Compiler = struct
 
   let rec compile_clos ctx (clos:Hir.Closure.t) : Context.t * Op.fundef =
-    Printf.printf "LIR: compile closure '%s'\n" clos.var.id;
+    Printf.printf "LIR: compile closure '%s'\n" clos.var.name;
     let open Context in
 
     (* parameters *)
@@ -513,7 +513,7 @@ module Compiler = struct
         ~f:(fun (ctx, params) var ->
             let ctx, param = new_param ctx
                 ~ty:(Raw_type.of_type var.ty)
-                ~name:var.id
+                ~name:var.name
             in
             ctx, param :: params)
     in
@@ -523,7 +523,7 @@ module Compiler = struct
 
     (* return value *)
     let clos_ctx =
-      match Op.special_fun clos.var.id with
+      match Op.special_fun clos.var.name with
       | `Fun _ -> clos_ctx (*add_op clos_ctx @@ Return clos_ctx.rc*)
       | `Main | `Init -> add_op clos_ctx @@ Nothing_return
     in
@@ -640,24 +640,24 @@ module Compiler = struct
       }
 
     | Var var ->
-      Printf.printf "LIR: compile var: %s\n" var.id;
+      Printf.printf "LIR: compile var: %s\n" var.name;
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Var reg)
 
     | Ref_fun var ->
-      Printf.printf "LIR: compile ref fun: %s\n" var.id;
+      Printf.printf "LIR: compile ref fun: %s\n" var.name;
       Printf.printf "type = %s\n" (Type.to_string var.ty);
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Ref_fun {
-            ref_fun_from = var.id;
+            ref_fun_from = var.name;
             ref_fun_to = reg;
           })
 
     | Ref_var var ->
-      Printf.printf "LIR: compile ref var: %s\n" var.id;
+      Printf.printf "LIR: compile ref var: %s\n" var.name;
       add_var_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Ref_var {
-            ref_var_from = get_local_exn ctx var.id;
+            ref_var_from = get_local_exn ctx var.name;
             ref_var_to = reg })
 
     | Ref_prop prop ->

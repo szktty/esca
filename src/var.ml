@@ -28,3 +28,17 @@ let local name ~kind ~type_ =
 
 let local_value name ~type_ =
   local name ~kind:`Value ~type_
+
+let to_string var =
+  Printf.sprintf "Var(%s, %s, %s, %s)"
+    var.name
+    begin match var.kind with
+      | `Type -> "type"
+      | `Value -> "value"
+    end
+    (Type.to_string var.type_)
+    begin match var.scope with
+      | `Local -> "Local"
+      | `Attr path ->
+        Printf.sprintf "Attr(%s)" (Namepath.to_string path)
+    end

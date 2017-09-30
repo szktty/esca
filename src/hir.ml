@@ -2,12 +2,10 @@
 
 open Core.Std
 
-type id = string
-
-module Var = struct
+module Id = struct
 
   type t = {
-    id : id;
+    name : string;
     ty : Type.t;
   }
 
@@ -43,9 +41,9 @@ module Op = struct
     | Call of call
     | Methcall of method_call
     | Binexp of binexp
-    | Var of Var.t
-    | Ref_fun of Var.t
-    | Ref_var of Var.t
+    | Var of Id.t
+    | Ref_fun of Id.t
+    | Ref_var of Id.t
     | Ref_prop of ref_prop
     | Prim of primitive
     | Null
@@ -56,15 +54,15 @@ module Op = struct
     | List of t list
 
   and fundef = {
-    fdef_var : Var.t; (* TODO: need? *)
+    fdef_var : Id.t; (* TODO: need? *)
     fdef_ty : Type.t;
     fdef_name : string;
-    fdef_params : Var.t list;
+    fdef_params : Id.t list;
     fdef_block : t list;
   }
 
   and vardef = {
-    vdef_var : Var.t;
+    vdef_var : Id.t;
     vdef_ptn : pattern;
     vdef_exp : t;
   }
@@ -80,7 +78,7 @@ module Op = struct
   }
 
   and switch_clause = {
-    sw_cls_var : Var.t;
+    sw_cls_var : Id.t;
     sw_cls_ptn : pattern;
     sw_cls_guard : t option;
     sw_cls_action : t list;
@@ -95,7 +93,7 @@ module Op = struct
     | Ptn_float of float
     | Ptn_list of pattern list
     | Ptn_tuple of pattern list
-    | Ptn_var of id
+    | Ptn_var of string
 
   and if_ = {
     if_actions : (t * t list) list;
@@ -103,7 +101,7 @@ module Op = struct
   }
 
   and return = {
-    ret_var : Var.t;
+    ret_var : Id.t;
     ret_val : t;
   }
 
@@ -150,9 +148,9 @@ module Closure = struct
   type t = {
     parent : t option;
     ty : Type.t;
-    var : Var.t;
+    var : Id.t;
     name : string;
-    params : Var.t list;
+    params : Id.t list;
     block : Op.t list;
   }
 
@@ -190,8 +188,8 @@ module Context = struct
     package : string option;
     stack : t list;
     id : int;
-    vars : Var.t list;
-    var_map : Var.t String.Map.t;
+    vars : Id.t list;
+    var_map : Id.t String.Map.t;
     mutable ret : Type.t;
     mutable prog : Program.t option;
   }
@@ -219,7 +217,7 @@ module Context = struct
 
   let new_var ?name ctx ty =
     let ctx, id = gen_id ctx in
-    let var = { Var.id = id; ty = ty } in
+    let var = { Id.name = id; ty = ty } in
     let ctx = match name with
       | None -> ctx
       | Some name -> { ctx with
@@ -240,7 +238,7 @@ module Context = struct
     String.Map.find ctx.var_map name
 
   (* TODO: type *)
-  let main_fun = { Var.id = "main"; ty = Type.void }
+  let main_fun = { Id.name = "main"; ty = Type.void }
 
 end
 
@@ -407,6 +405,9 @@ module Compiler = struct
     | `Var var ->
       let name = var.var_name.desc in
       Printf.printf "HIR: compile var '%s'\n" name;
+      Option.iter var.var_var
+        ~f:(fun var ->
+            Printf.printf "HIR: var = %s\n" (Var.to_string var));
       let ty = Type.unwrap @@ Option.value_exn var.var_type in
       begin match Type.prim_id ty with
         | Some id ->
@@ -415,7 +416,7 @@ module Compiler = struct
           match var.var_prefix with
           | None ->
             begin match get_var ctx name with
-              | None -> ctx, Ref_fun { Var.id = name; ty }
+              | None -> ctx, Ref_fun { Id.name; ty }
               | Some var -> ctx, Ref_var var
             end
           | Some prefix ->
