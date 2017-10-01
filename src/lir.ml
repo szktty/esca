@@ -235,7 +235,9 @@ module Program = struct
           add_string buf @@ sprintf "\"%s/%s\"\n" !Config.runlib_path pkg);
     List.iter prog.used_mods
       ~f:(fun m ->
-          add_string buf @@ sprintf "\"%s\"\n" (Module.package m));
+          add_string buf @@ sprintf "%s \"%s\"\n"
+            (Go.Name.import_name @@ Module.namepath m)
+            (Module.package m));
     add_string buf ")\n\n"
 
   and write_poly buf (poly:poly) =
