@@ -5,7 +5,7 @@ import (
 	"github.com/szktty/esca/runtime/base"
 )
 
-func EscaPrimPrint(arg string) types.Void {
-	fmt.Println(arg)
+func EscaValue_show(value string) types.Void {
+	fmt.Println(value)
 	return types.Void{}
 }
