@@ -291,7 +291,7 @@ let rec infer (e:Ast.t)
       | `For for_ ->
         let range_ty = easy_infer for_.for_range ~clos ~env in
         unify ~ex:Type.range ~ac:(easy_infer ~clos ~env for_.for_range);
-        let var = Var.local for_.for_var.desc ~kind:`Value ~type_:Type.int in
+        let var = Value.local for_.for_var.desc ~kind:`Value ~type_:Type.int in
         let env = Env.add env var in
         let _, block_ty = infer_block ~clos ~env for_.for_block in
         unify ~ex:Type.void ~ac:block_ty;
@@ -344,13 +344,13 @@ let rec infer (e:Ast.t)
         let fun_ty = Type.fun_ (Some loc) params ret in
         fdef.fdef_type <- Some fun_ty;
         (* for recursive call *)
-        let fun_var = Var.local fdef.fdef_name.desc
+        let fun_var = Value.local fdef.fdef_name.desc
             ~kind:`Value
             ~type_:fun_ty in
         let env = Env.add env fun_var in
         let fenv = List.fold2_exn fdef.fdef_params params ~init:env
             ~f:(fun env name type_ ->
-                Env.add env (Var.local_value name.desc ~type_))
+                Env.add env (Value.local_value name.desc ~type_))
         in
         let _, ret' = infer_block fdef.fdef_block ~clos:clos' ~env:fenv in
         (*unify ~ex:ret ~ac:ret';*)
@@ -415,7 +415,7 @@ let rec infer (e:Ast.t)
                     | None -> failwith ("module attribute is not found: " ^ aname)
                     | Some attr ->
                       Module.use m;
-                      var.var_var <- Some attr;
+                      var.var_val <- Some attr;
                       attr.type_
                 end
               | _ ->
@@ -427,7 +427,7 @@ let rec infer (e:Ast.t)
             match Env.find env name with
             | None -> failwith ("variable is not found: " ^ name)
             | Some attr ->
-              var.var_var <- Some attr;
+              var.var_val <- Some attr;
               attr.type_
         in
         var.var_type <- Some ty;
@@ -554,7 +554,7 @@ and infer_sw_cls ~clos ~env match_ty val_ty (cls:Ast.switch_cls) =
   (* var *)
   let env = Option.value_map cls.sw_cls_var
       ~default:env
-      ~f:(fun name -> Env.add env (Var.local_value name.desc ~type_:match_ty))
+      ~f:(fun name -> Env.add env (Value.local_value name.desc ~type_:match_ty))
   in
 
   (* action *)
@@ -571,7 +571,7 @@ and infer_ptn ~clos ~env (ptn:Ast.pattern) =
 
   | `Var name ->
     let ty = Type.create_metavar name.loc in
-    Env.add env (Var.local_value name.desc ~type_:ty), ty
+    Env.add env (Value.local_value name.desc ~type_:ty), ty
 
   | `List elts ->
     let ty = Type.create_metavar_some @@ Ast.location ptn.ptn_cls in

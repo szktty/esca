@@ -6,7 +6,7 @@ type t = {
   package : string;
   mutable submodules : t list;
   mutable imports : t list;
-  mutable attrs : Var.Map.t;
+  mutable attrs : Value.Map.t;
   mutable is_used : bool;
 }
 
@@ -58,7 +58,7 @@ let rec find_attr m key =
     | None -> None
 
 let add_attr m attr =
-  m.attrs <- Var.Map.add m.attrs attr
+  m.attrs <- Value.Map.add m.attrs attr
 
 let package m = m.package
 

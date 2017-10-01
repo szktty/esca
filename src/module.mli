@@ -4,7 +4,7 @@ val create :
   ?parent:t
   -> ?submodules:t list
   -> ?imports:t list
-  -> ?attrs:Var.Map.t
+  -> ?attrs:Value.Map.t
   -> string
   -> package:string
   -> t
@@ -25,11 +25,11 @@ val find_module : ?prefix:string list -> t -> name:string -> t option
 
 val add_module : t -> t -> unit
 
-val attrs : t -> Var.Map.t
+val attrs : t -> Value.Map.t
 
-val find_attr : t -> string -> Var.t option
+val find_attr : t -> string -> Value.t option
 
-val add_attr : t -> Var.t -> unit
+val add_attr : t -> Value.t -> unit
 
 val package : t -> string
 

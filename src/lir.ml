@@ -721,7 +721,7 @@ module Compiler = struct
       Printf.printf "LIR: compile ref: %s\n" var.name;
       add_var_op ctx (Raw_type.of_type var.type_)
         ~f:(fun reg -> Ref {
-            ref_path = Var.path var;
+            ref_path = Value.path var;
             ref_to = reg })
 
     | Poly fn ->

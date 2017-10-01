@@ -175,7 +175,7 @@ FILES[] =
 	type
 	typing
 	utils
-	var
+	value
 	lib
 	lib_kernel
 

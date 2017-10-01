@@ -2,12 +2,12 @@ open Core
 
 type t = {
   imports : Module.t list;
-  attrs : Var.Map.t;
+  attrs : Value.Map.t;
 }
 
 let create ?(imports=[]) ?attrs () =
   { imports;
-    attrs = Option.value attrs ~default:Var.Map.empty;
+    attrs = Option.value attrs ~default:Value.Map.empty;
   }
 
 let import env m =
@@ -20,7 +20,7 @@ let find env key =
               ~f:(fun _ m -> Module.find_attr m key)
 
 let add env var =
-  { env with attrs = Var.Map.add env.attrs var }
+  { env with attrs = Value.Map.add env.attrs var }
 
 let concat env =
   let f attrs accu =

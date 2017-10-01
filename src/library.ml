@@ -40,22 +40,22 @@ module Spec = struct
     mod_name : string;
     init : bool;
     parent : string option;
-    attrs : Var.Map.t;
+    attrs : Value.Map.t;
     package : string;
   }
 
   let define ?parent ?(init=false) name ~package =
-    { mod_name = name; init; parent; package; attrs = Var.Map.empty }
+    { mod_name = name; init; parent; package; attrs = Value.Map.empty }
 
   let (+>) spec attr =
-    { spec with attrs = Var.Map.add spec.attrs attr }
+    { spec with attrs = Value.Map.add spec.attrs attr }
 
   let typ name type_ =
-    Var.local name ~kind:`Type ~type_
+    Value.local name ~kind:`Type ~type_
 
   let value name type_ = 
     (* TODO: primitive *)
-    Var.local name ~kind:`Value ~type_
+    Value.local name ~kind:`Value ~type_
 
   let int name =
     value name Type.int
@@ -69,7 +69,7 @@ module Spec = struct
   let end_ spec =
     (* TODO: parent *)
     Printf.printf "# add module %s\n" spec.mod_name;
-    let attrs = Var.Map.map spec.attrs ~f:(fun attr ->
+    let attrs = Value.Map.map spec.attrs ~f:(fun attr ->
         { attr with scope = `Module (Namepath.create spec.mod_name) }) in
     let m = Module.create spec.mod_name ~attrs ~package:spec.package in
     top_modules := m :: !top_modules;

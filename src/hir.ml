@@ -42,7 +42,7 @@ module Op = struct
     | Methcall of method_call
     | Binexp of binexp
     | Var of Id.t
-    | Ref of Var.t
+    | Ref of Value.t
     | Poly of poly
     | Ref_fun of Id.t
     | Ref_prop of ref_prop
@@ -418,11 +418,11 @@ module Compiler = struct
     | `Var var ->
       let name = var.var_name.desc in
       Printf.printf "HIR: compile var '%s'\n" name;
-      Option.iter var.var_var
-        ~f:(fun var ->
-            Printf.printf "HIR: var = %s\n" (Var.to_string var));
+      Option.iter var.var_val
+        ~f:(fun value ->
+            Printf.printf "HIR: var = %s\n" (Value.to_string value));
 
-      let desc = Option.value_exn var.var_var in
+      let desc = Option.value_exn var.var_val in
       begin match desc with
         | { scope = `Module path;
             type_ = { desc = `Poly { contents = `Unify ty } };

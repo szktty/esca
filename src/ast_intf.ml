@@ -125,7 +125,7 @@ and var = {
   var_prefix : t option;
   var_name : text;
   mutable var_type : Type.t option; (* TODO: deprecated *)
-  mutable var_var : Var.t option;
+  mutable var_val : Value.t option;
 }
 
 and if_ = {
