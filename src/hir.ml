@@ -180,10 +180,11 @@ module Program = struct
     file : string;
     package : string option;
     funs : Closure.t list;
+    used_mods : Module.t list;
   }
 
-  let create ~file ~package ~funs =
-    { file; package; funs }
+  let create ~file ~package ~funs ~used_mods =
+    { file; package; funs; used_mods }
 
 end
 
@@ -197,6 +198,7 @@ module Context = struct
     vars : Id.t list;
     var_map : Id.t String.Map.t;
     mutable ret : Type.t;
+    mutable used_mods : Module.t list;
     mutable prog : Program.t option;
   }
 
@@ -208,6 +210,7 @@ module Context = struct
       vars = [];
       var_map = String.Map.empty;
       ret = Type.void;
+      used_mods = [];
       prog = None;
     }
 
@@ -246,6 +249,9 @@ module Context = struct
   (* TODO: type *)
   let main_fun = { Id.name = "main"; ty = Type.void }
 
+  let use_module ctx m =
+    ctx.used_mods <- m :: ctx.used_mods
+
 end
 
 module Compiler = struct
@@ -276,7 +282,8 @@ module Compiler = struct
       ctx.prog <- Some (Program.create
                           ~file:ctx.file
                           ~package:ctx.package
-                          ~funs);
+                          ~funs
+                          ~used_mods:ctx.used_mods);
       ctx, Nop
 
     | `Package name ->
@@ -420,6 +427,9 @@ module Compiler = struct
         | { scope = `Module path;
             type_ = { desc = `Poly { contents = `Unify ty } };
             name } ->
+          (* TODO: namepath *)
+          let m = Option.value_exn (Library.find_module path.name) in
+          use_module ctx m;
           ctx, Poly {
             poly_path = Namepath.create name ~prefix:(Some path);
             poly_type = ty }

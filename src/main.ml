@@ -63,7 +63,7 @@ let command =
              Ast.print node
            else begin
              let node = parse_file file in
-             let mod_ = Module.create file in
+             let mod_ = Module.create file ~package:"" in (* TODO: package *)
              ignore @@ Typing.run mod_ node;
 
              let out = Hir.Compiler.run file node

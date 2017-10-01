@@ -187,15 +187,14 @@ module Program = struct
     funs : Op.fundef list;
     main : string option;
     polys : poly list;
+    used_mods : Module.t list;
   }
 
   let basic_pkgs = [
-    "base";
-    "lib/kernel";
   ]
 
-  let create ~src ~out ~pkg ~vars ~funs ~main ~polys =
-    { src; out; pkg; vars; funs; main; polys }
+  let create ~src ~out ~pkg ~vars ~funs ~main ~polys ~used_mods =
+    { src; out; pkg; vars; funs; main; polys; used_mods }
 
   let ext = ".go"
 
@@ -228,12 +227,15 @@ module Program = struct
         add_string buf @@ Option.value prog.pkg ~default:"main";
         add_string buf "\n\n")
 
-  and write_import buf _prog =
+  and write_import buf prog =
     let open Buffer in
     add_string buf "import (\n";
     List.iter basic_pkgs
       ~f:(fun pkg ->
           add_string buf @@ sprintf "\"%s/%s\"\n" !Config.runlib_path pkg);
+    List.iter prog.used_mods
+      ~f:(fun m ->
+          add_string buf @@ sprintf "\"%s\"\n" (Module.package m));
     add_string buf ")\n\n"
 
   and write_poly buf (poly:poly) =
@@ -804,6 +806,7 @@ module Compiler = struct
         ~funs
         ~polys:ctx.polys
         ~main:(Option.map ctx.main ~f:(fun reg -> reg.id))
+        ~used_mods:prog.used_mods
     in
     Program.write prog
 

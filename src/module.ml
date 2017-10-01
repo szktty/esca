@@ -3,13 +3,15 @@ open Core.Std
 type t = {
   parent : t option;
   name : string;
+  package : string;
   mutable submodules : t list;
   mutable imports : t list;
   mutable attrs : Var.Map.t;
+  mutable is_used : bool;
 }
 
-let create ?parent ?(submodules=[]) ?(imports=[]) ?attrs name =
-  { parent; name; submodules; imports;
+let create ?parent ?(submodules=[]) ?(imports=[]) ?attrs name ~package =
+  { parent; name; submodules; imports; package; is_used = false;
     attrs = Option.value attrs ~default:String.Map.empty }
 
 let name m = m.name
@@ -57,3 +59,10 @@ let rec find_attr m key =
 
 let add_attr m attr =
   m.attrs <- Var.Map.add m.attrs attr
+
+let package m = m.package
+
+let use m =
+  m.is_used <- true
+
+let is_used m = m.is_used

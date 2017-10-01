@@ -6,6 +6,7 @@ val create :
   -> ?imports:t list
   -> ?attrs:Var.Map.t
   -> string
+  -> package:string
   -> t
 
 val name : t -> string
@@ -29,3 +30,9 @@ val attrs : t -> Var.Map.t
 val find_attr : t -> string -> Var.t option
 
 val add_attr : t -> Var.t -> unit
+
+val package : t -> string
+
+val use : t -> unit
+
+val is_used : t -> bool

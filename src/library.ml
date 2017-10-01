@@ -41,10 +41,11 @@ module Spec = struct
     init : bool;
     parent : string option;
     attrs : Var.Map.t;
+    package : string;
   }
 
-  let define ?parent ?(init=false) name =
-    { mod_name = name; init; parent; attrs = Var.Map.empty }
+  let define ?parent ?(init=false) name ~package =
+    { mod_name = name; init; parent; package; attrs = Var.Map.empty }
 
   let (+>) spec attr =
     { spec with attrs = Var.Map.add spec.attrs attr }
@@ -70,7 +71,7 @@ module Spec = struct
     Printf.printf "# add module %s\n" spec.mod_name;
     let attrs = Var.Map.map spec.attrs ~f:(fun attr ->
         { attr with scope = `Module (Namepath.create spec.mod_name) }) in
-    let m = Module.create spec.mod_name ~attrs in
+    let m = Module.create spec.mod_name ~attrs ~package:spec.package in
     top_modules := m :: !top_modules;
     if spec.init then begin
       top_imports := m :: !top_imports;

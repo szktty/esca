@@ -245,7 +245,7 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | _, _ ->
     raise (Unify_error { uniexn_ex = ex; uniexn_ac = ac })
 
-let owner = ref (Module.create "dummy")
+let owner = ref (Module.create "dummy" ~package:"")
 
 let rec infer (e:Ast.t) 
     ~(clos:Closure.t)
@@ -414,6 +414,7 @@ let rec infer (e:Ast.t)
                     match Module.find_attr m aname with
                     | None -> failwith ("module attribute is not found: " ^ aname)
                     | Some attr ->
+                      Module.use m;
                       var.var_var <- Some attr;
                       attr.type_
                 end

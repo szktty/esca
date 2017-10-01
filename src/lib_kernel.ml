@@ -2,6 +2,7 @@ open Core.Std
 
 let init () =
   Library.Spec.(define "Kernel" ~init:true
+                  ~package:(Config.runtime_package "lib/kernel")
                 +> typ "Void" Type.void
                 +> typ "Bool" Type.bool
                 +> typ "Int" Type.int
