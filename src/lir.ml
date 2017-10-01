@@ -398,6 +398,9 @@ module Program = struct
       addln @@ sprintf "%s = %s" ref.ref_to.id
         (Go.Name.value_path ref.ref_path)
 
+    | Poly poly ->
+      addln @@ sprintf "%s = %s" poly.poly_to.id poly.poly_box
+
     | Ref_fun ref ->
       addln @@ sprintf "%s = %s" ref.ref_fun_to.id ref.ref_fun_from
 
