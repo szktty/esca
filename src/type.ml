@@ -7,6 +7,7 @@ and desc = [
   | `Var of tyvar
   | `Poly of [ `Preunify of tyvar list * t | `Unify of t ] ref
   | `Prim of primitive
+  | `Unique of t * Valuepath.t
   | `Meta of metavar
 ]
 
@@ -29,7 +30,6 @@ and tycon = [
   | `Module of string
   | `Stream
   | `Tyfun of tyvar list * t
-  | `Unique of tycon * int
 ]
 
 and tyvar = string
@@ -62,24 +62,7 @@ let equal (ty1:t) (ty2:t) =
 let rec to_string (ty:t) =
   match ty.desc with
   | `App (tycon, args) ->
-    let tycon_s = match tycon with
-      | `Void -> "Void"
-      | `Bool -> "Bool"
-      | `Int -> "Int"
-      | `Float -> "Float"
-      | `String -> "String"
-      | `List -> "List"
-      | `Tuple -> "Tuple"
-      | `Range -> "Range"
-      | `Fun -> "Fun"
-      | `Fun_printf -> "Fun_printf"
-      | `Method ty -> Printf.sprintf "Method(%s)" (to_string ty)
-      | `Stream -> "Stream"
-      | `Option -> "Option"
-      | `Box -> "Box"
-      | `Module name -> Printf.sprintf "Module(%s)" name
-      | _ -> failwith "not impl"
-    in
+    let tycon_s = tycon_to_string tycon in
     let args_s =
       List.map args ~f:to_string
       |> String.concat ~sep:", "
@@ -96,6 +79,27 @@ let rec to_string (ty:t) =
   | `Prim prim ->
     Printf.sprintf "Prim(\"%s.%s\", %s)"
       prim.prim_pkg prim.prim_id (to_string prim.prim_type)
+  | `Unique (ty, path) ->
+    Printf.sprintf "Unique(%s, \"%s\")"
+      (to_string ty) (Namepath.to_string path) 
+
+and tycon_to_string = function
+  | `Void -> "Void"
+  | `Bool -> "Bool"
+  | `Int -> "Int"
+  | `Float -> "Float"
+  | `String -> "String"
+  | `List -> "List"
+  | `Tuple -> "Tuple"
+  | `Range -> "Range"
+  | `Fun -> "Fun"
+  | `Fun_printf -> "Fun_printf"
+  | `Method ty -> Printf.sprintf "Method(%s)" (to_string ty)
+  | `Stream -> "Stream"
+  | `Option -> "Option"
+  | `Box -> "Box"
+  | `Module name -> Printf.sprintf "Module(%s)" name
+  | _ -> failwith "not impl"
 
 let rec unwrap (ty:t) =
   match ty.desc with
@@ -194,8 +198,8 @@ let prim pkg name ty =
 let module_ name = Located.less @@ app (`Module name)
 let stream = Located.less @@ desc_stream 
 
-let unique tycon =
-  Located.less @@ `Unique (tycon,  Random.int 10000)
+let unique ty ~path =
+  Located.less @@ `Unique (ty, path)
 
 let struct_ fields =
   let names, tys = List.fold_left fields ~init:([], [])

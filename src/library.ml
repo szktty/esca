@@ -70,6 +70,13 @@ module Spec = struct
     (* TODO: parent *)
     Printf.printf "# add module %s\n" spec.mod_name;
     let attrs = Value.Map.map spec.attrs ~f:(fun attr ->
+        let attr = match attr.kind with
+          | `Value -> attr
+          | `Type ->
+            let path = Namepath.of_list [spec.mod_name; attr.name] in
+            let ty = Type.unique attr.type_ ~path in
+            { attr with type_ = ty }
+        in
         { attr with scope = `Module (Namepath.create spec.mod_name) }) in
     let m = Module.create spec.mod_name ~attrs ~package:spec.package in
     top_modules := m :: !top_modules;
@@ -90,3 +97,12 @@ let test () =
   let sub = Module.define "Test" ~parent:kernel in
   sub
  *)
+
+let builtin_types : (Type.t * Valuepath.t) list ref = ref []
+
+let add_builtin_type ty ~path =
+  let path = Namepath.of_list path in
+  builtin_types := (ty, path) :: !builtin_types
+
+let find_builtin_type_path ty =
+  List.Assoc.find ty ~equal:(=)

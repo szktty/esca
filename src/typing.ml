@@ -97,6 +97,7 @@ let rec generalize (ty:Type.t) : Type.t =
       | `Poly _ -> ty.desc
       | `Prim prim ->
         `Prim { prim with prim_type = walk prim.prim_type }
+      | `Unique (ty, path) -> `Unique (walk ty, path)
     in
     Located.create ty.loc gen
   in
@@ -141,6 +142,9 @@ let rec subst (ty:Type.t) (env:(tyvar * t) list) =
   | `Prim prim ->
     Located.create ty.loc @@
     `Prim { prim with prim_type = subst prim.prim_type env }
+
+  | `Unique (ty, path) ->
+    Located.create ty.loc @@ `Unique (subst ty env, path)
 
   | `Meta { contents = Some ty' } ->
     Option.value_map (List.find env ~f:(fun (_, ty) -> ty = ty'))

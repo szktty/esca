@@ -2,10 +2,9 @@ package kernel
 
 import (
 	"fmt"
-	"github.com/szktty/esca/runtime/base"
 )
 
-func EscaValue_show(value interface{}) types.Void {
+func EscaValue_show(value interface{}) Void {
 	fmt.Println(value)
-	return types.Void{}
+	return Void{}
 }

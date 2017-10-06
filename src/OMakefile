@@ -176,6 +176,7 @@ FILES[] =
 	typing
 	utils
 	value
+	valuepath
 	lib
 	lib_kernel
 

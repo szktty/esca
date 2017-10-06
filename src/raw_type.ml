@@ -47,7 +47,7 @@ let rec of_type (ty:Type.t) : t =
     failwith "of_type: not supported"
 
 let rec to_string = function
-  | Void -> "Void"
+  | Void -> Printf.sprintf "%sKernel.Void" Go.Name.import_prefix
   | Bool -> "bool"
   | Uint -> "uint"
   | Uint8 -> "uint8"

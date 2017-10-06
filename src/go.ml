@@ -16,11 +16,13 @@ module Name = struct
 
   let prim_pkg = "esca.module"
 
+  let import_prefix = "__EscaModule_"
+
   let pkg_name ~base mod_name =
     Printf.sprintf "%s.%s" base (Namepath.to_string ~sep:"." mod_name)
 
   let import_name mod_name =
-    Printf.sprintf "__EscaModule_%s" (Namepath.to_string ~sep:"_" mod_name)
+    Printf.sprintf "%s%s" import_prefix (Namepath.to_string ~sep:"_" mod_name)
 
   let symbol ~kind name =
     let prefix = match kind with

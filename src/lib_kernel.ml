@@ -20,8 +20,7 @@ let init () =
                 +> string "version"
                 |> end_);
 
-  let open Type in
-  Property.add_method string
+  Property.add_method Type.string
     ~name:"length"
-    ~spec:Spec.(string @-> int);
+    ~spec:Type.Spec.(string @-> int);
   ()

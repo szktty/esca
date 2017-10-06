@@ -5,6 +5,8 @@ type 'a t = {
   name : 'a;
 }
 
+type value_path = string t
+
 let create ?(prefix=None) name =
   { prefix; name }
 
@@ -12,6 +14,12 @@ let rec to_rev_list path =
   match path.prefix with
   | None -> [path.name]
   | Some prefix -> path.name :: to_rev_list prefix
+
+let of_list (names:'a list) : 'a t =
+  Option.value_exn
+    (List.fold_right names
+       ~init:None
+       ~f:(fun name prefix -> Some (create name ~prefix)))
 
 let to_list path =
   List.rev @@ to_rev_list path
