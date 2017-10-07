@@ -293,7 +293,6 @@ let rec infer (e:Ast.t)
         (env, desc_void)
 
       | `For for_ ->
-        let range_ty = easy_infer for_.for_range ~clos ~env in
         unify ~ex:Type.range ~ac:(easy_infer ~clos ~env for_.for_range);
         let var = Value.local for_.for_var.desc ~kind:`Value ~type_:Type.int in
         let env = Env.add env var in
@@ -306,7 +305,6 @@ let rec infer (e:Ast.t)
       | `Int _ -> (env, desc_int)
       | `Float _ -> (env, desc_float)
       | `String _ -> (env, desc_string)
-      | `Range _ -> (env, desc_range)
 
       | `List es ->
         begin match es with
@@ -320,6 +318,11 @@ let rec infer (e:Ast.t)
 
       | `Tuple es ->
         (env, desc_tuple (List.map es ~f:(fun e -> easy_infer ~clos ~env e)))
+
+      | `Range range ->
+        unify ~ex:Type.int ~ac:(easy_infer range.range_begin ~clos ~env);
+        unify ~ex:Type.int ~ac:(easy_infer range.range_end ~clos ~env);
+        (env, desc_range)
 
       | `Vardef vdef ->
         let exp_ty = easy_infer ~clos ~env vdef.vdef_exp in

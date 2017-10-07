@@ -102,6 +102,7 @@ let create_unexp op_loc op exp =
 %nonassoc NE EQQ
 %left LT GT LE GE
 %left RPIPE LPIPE
+%nonassoc DOT2LT DOT3
 %left PLUS FPLUS MINUS FMINUS
 %left AST FAST SLASH FSLASH PCT
 %right AST2
@@ -189,6 +190,7 @@ exp:
   | fun_exp { $1 }
   | bin_exp { $1 }
   | unary_exp { $1 }
+  | range { $1 }
   | simple_exp %prec app { $1 }
 
 exp_list:
@@ -500,7 +502,6 @@ literal:
   | FALSE { `Bool (locate $1 false) }
   | list_ { `List $1 }
   | tuple { `Tuple $1 }
-  | range { $1 }
   | struct_ { $1 }
 
 list_:
@@ -518,10 +519,10 @@ tuple:
   | LPAREN exp COMMA rev_elts RPAREN { $2 :: (Core.Std.List.rev $4) }
 
 range:
-  | INT DOT2LT INT
-  { `Range { range_begin = $1; range_end = $3; range_open = `Half_open } }
-  | INT DOT3 INT
-  { `Range { range_begin = $1; range_end = $3; range_open = `Closed } }
+  | exp DOT2LT exp
+  { `Range { range_begin = $1; range_end = $3; range_kind = `Half_open } }
+  | exp DOT3 exp
+  { `Range { range_begin = $1; range_end = $3; range_kind = `Closed } }
 
 struct_:
   | HASH_NEW namepath LBRACE key_value_pairs RBRACE

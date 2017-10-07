@@ -200,12 +200,13 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     write_nodes exps;
     add_rp ()
   | `Range range ->
-    add_string @@ sprintf "(range %d%s%d)"
-      range.range_begin.desc
-      (match range.range_open with
-       | `Half_open -> "..<"
-       | `Closed -> "...")
-      range.range_end.desc
+    add_string "(range ";
+    write range.range_begin;
+    add_string @@ (match range.range_kind with
+        | `Half_open -> "..<"
+        | `Closed -> "...");
+    write range.range_end;
+    add_rp ()
   | `Struct str ->
     add_string "{";
     Namepath.iter str.str_namepath ~f:(fun name ->

@@ -169,9 +169,9 @@ and index = {
 }
 
 and range = {
-  range_begin : int Located.t;
-  range_end : int Located.t;
-  range_open : [`Half_open | `Closed];
+  range_begin : t;
+  range_end : t;
+  range_kind : [`Half_open | `Closed];
 }
 
 and 'a struct_ = {

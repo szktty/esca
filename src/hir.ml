@@ -36,6 +36,7 @@ module Op = struct
     | Assign of assign
     | Switch of switch
     | If of if_
+    | For of for_
     | Return of return option
     | Block of t list
     | Call of call
@@ -53,6 +54,7 @@ module Op = struct
     | Int of int
     | Float of float
     | List of t list
+    | Range of range
 
   and fundef = {
     fdef_var : Id.t; (* TODO: need? *)
@@ -101,6 +103,12 @@ module Op = struct
     if_else : t list;
   }
 
+  and for_ = {
+    for_var : Id.t;
+    for_range : t;
+    for_block : t list;
+  }
+
   and return = {
     ret_var : Id.t;
     ret_val : t;
@@ -145,6 +153,12 @@ module Op = struct
     ref_prop_obj : t;
     ref_prop_name : string;
     ref_prop_ty : Type.t
+  }
+
+  and range = {
+    range_begin : t;
+    range_end : t;
+    range_kind : [`Half_open | `Closed];
   }
 
 end
@@ -364,6 +378,15 @@ module Compiler = struct
       let other = compile_fold' ctx if_.if_else in
       ctx, If { if_actions = claus; if_else = other }
 
+    | `For for_ ->
+      Printf.printf "HIR: compile for\n";
+      let range_op = compile_node' ctx for_.for_range in
+      let ctx', var = new_var ctx Type.int ~name:for_.for_var.desc in
+      let block_ops = compile_fold' ctx' for_.for_block in
+      ctx, For { for_var = var;
+                 for_range = range_op;
+                 for_block = block_ops }
+
     | `Return exp ->
       Printf.printf "HIR: compile return\n";
       let ctx, ret = match exp with
@@ -456,6 +479,13 @@ module Compiler = struct
                                 ref_prop_ty = ty }
           end
       end
+
+    | `Range range ->
+      let begin_op = compile_node' ctx range.range_begin in
+      let end_op = compile_node' ctx range.range_end in
+      ctx, Range { range_begin = begin_op;
+                   range_end = end_op;
+                   range_kind = range.range_kind }
 
     | `Bool value -> ctx, Bool value.desc
     | `Int value -> ctx, Int value.desc

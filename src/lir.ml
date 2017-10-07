@@ -68,6 +68,9 @@ module Op = struct
     | Nothing_return
     | Label of label
 
+    | For of Register.t * Register.t
+    | End
+
     | Call of call
     | Methcall of method_call
     | Binexp of binexp
@@ -85,6 +88,7 @@ module Op = struct
     | Int of Register.t * int
     | Float of float
     | String of Register.t * string
+    | Range of range
 
   and context = {
     ctx_src : string;
@@ -162,6 +166,13 @@ module Op = struct
   and primitive = {
     prim_rc : Register.t;
     prim_id : string;
+  }
+
+  and range = {
+    range_to : Register.t;
+    range_begin : Register.t;
+    range_end : Register.t;
+    range_kind : [`Half_open | `Closed];
   }
 
   let special_fun = function
@@ -356,6 +367,13 @@ module Program = struct
     | Nothing_return ->
       addln @@ sprintf "return"
 
+    | For (var, range) ->
+      addln @@ sprintf "for %s := %s.Begin; %s < %s.End; %s++ {"
+        var.id range.id var.id range.id var.id
+
+    | End ->
+      addln "}"
+
     | Call call ->
       Printf.printf "call\n";
       with_exp buf call.call_rc.id
@@ -421,6 +439,19 @@ module Program = struct
 
     | String (reg, value) ->
       with_exp buf reg.id ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
+
+    | Range range ->
+      with_exp buf range.range_to.id ~f:(fun _ ->
+          let fname =
+            match range.range_kind with
+            | `Closed -> "CreateClosedRange"
+            | `Half_open -> "CreateHalfOpenRange"
+          in
+          add @@ sprintf "%s.%s(%s, %s)"
+            Raw_type.kernel_decl
+            fname
+            range.range_begin.id
+            range.range_end.id)
 
     | _ -> ()
 
@@ -649,6 +680,17 @@ module Compiler = struct
       let ctx = compile_block ctx if_.if_else in
       add_op ctx @@ Label end_
 
+    | For for_ ->
+      Printf.printf "LIR: compile for\n";
+      let ctx, var_reg = new_param ctx
+          ~ty:Raw_type.Int
+          ~name:for_.for_var.name in
+      let ctx = compile_op ctx for_.for_range in
+      let range_reg = ctx.rc in
+      let ctx = add_op ctx @@ For (var_reg, range_reg) in
+      let ctx = compile_block ctx for_.for_block in
+      add_op ctx @@ End
+
     | Return ret ->
       Printf.printf "LIR: compile return\n";
       begin match ret with
@@ -766,6 +808,19 @@ module Compiler = struct
       Printf.printf "LIR: compile string\n";
       add_var_op ctx Raw_type.String
         ~f:(fun reg -> String (reg, value))
+
+    | Range range ->
+      Printf.printf "LIR: compile range\n";
+      let ctx = compile_op ctx range.range_begin in
+      let begin_op = ctx.rc in
+      let ctx = compile_op ctx range.range_end in
+      let end_op = ctx.rc in
+      add_var_op ctx Raw_type.Range
+        ~f:(fun reg -> Range {
+            range_to = reg;
+            range_begin = begin_op;
+            range_end = end_op;
+            range_kind = range.range_kind })
 
     | _ -> ctx
 

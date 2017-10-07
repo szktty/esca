@@ -18,6 +18,7 @@ type t =
   | String
   | List of t
   | Option of t
+  | Range
   | Fun of t list * t
 
 let rec of_type (ty:Type.t) : t =
@@ -32,6 +33,7 @@ let rec of_type (ty:Type.t) : t =
   | `App (`Int, []) -> Int
   | `App (`Float, []) -> Float32
   | `App (`String, []) -> String
+  | `App (`Range, []) -> Range
   | `App (`Fun, args)
   | `App (`Method _, args) ->
     let rec collect args accu =
@@ -46,8 +48,12 @@ let rec of_type (ty:Type.t) : t =
   | _ -> Printf.printf "type = %s\n" (Type.to_string ty);
     failwith "of_type: not supported"
 
+let kernel_decl = Printf.sprintf "%sKernel" Go.Name.import_prefix
+let void_decl = Printf.sprintf "%s.Void" kernel_decl
+let range_decl = Printf.sprintf "%s.Range" kernel_decl
+
 let rec to_string = function
-  | Void -> Printf.sprintf "%sKernel.Void" Go.Name.import_prefix
+  | Void -> void_decl
   | Bool -> "bool"
   | Uint -> "uint"
   | Uint8 -> "uint8"
@@ -62,6 +68,7 @@ let rec to_string = function
   | Float32 -> "float32"
   | Float64 -> "float64"
   | String -> "string"
+  | Range -> range_decl
   | Fun (args, ret) ->
     let open Buffer in
     let buf = create 16 in
