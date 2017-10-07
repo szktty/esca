@@ -143,6 +143,7 @@ and for_ = {
 and switch = {
   sw_val : t;
   sw_cls : switch_cls list;
+  sw_default : t list option;
   mutable sw_val_type : Type.t option;
   mutable sw_cls_type : Type.t option;
 }

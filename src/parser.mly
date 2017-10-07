@@ -72,6 +72,7 @@ let create_unexp op_loc op exp =
 %token <Location.t> AND             (* "and" *)
 %token <Location.t> OR              (* "or" *)
 %token CASE                         (* "case" *)
+%token DEFAULT                      (* "default" *)
 %token ELSE                         (* "else" *)
 %token ELSEIF                       (* "elseif" *)
 %token ENUM                         (* "enum" *)
@@ -344,6 +345,15 @@ switch_stat:
   { `Switch {
         sw_val = $2;
         sw_cls = $4;
+        sw_default = None;
+        sw_val_type = None;
+        sw_cls_type = None; }
+  }
+  | SWITCH exp LBRACE sw_clause_list DEFAULT COLON block RBRACE
+  { `Switch {
+        sw_val = $2;
+        sw_cls = $4;
+        sw_default = Some $7;
         sw_val_type = None;
         sw_cls_type = None; }
   }

@@ -106,6 +106,7 @@ rule read =
   | "and"       { AND (to_loc lexbuf) }
   | "or"        { OR (to_loc lexbuf) }
   | "case"      { CASE }
+  | "default"   { DEFAULT }
   | "else"      { ELSE }
   | "enum"      { ENUM }
   | "for"       { FOR }
