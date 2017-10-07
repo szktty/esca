@@ -32,7 +32,8 @@ let create_unexp op_loc op exp =
 %token RBRACE
 %token COMMA                        (* "," *)
 %token DOT                          (* "." *)
-%token DOT2                         (* ".." *)
+%token DOT2LT                       (* "..<" *)
+%token DOT3                         (* "..." *)
 %token COLON                        (* ":" *)
 %token COLON2                       (* "::" *)
 %token SEMI                         (* ";" *)
@@ -499,7 +500,7 @@ literal:
   | FALSE { `Bool (locate $1 false) }
   | list_ { `List $1 }
   | tuple { `Tuple $1 }
-  | INT DOT2 INT { `Range ($1, $3) }
+  | range { $1 }
   | struct_ { $1 }
 
 list_:
@@ -515,6 +516,12 @@ rev_elts:
 
 tuple:
   | LPAREN exp COMMA rev_elts RPAREN { $2 :: (Core.Std.List.rev $4) }
+
+range:
+  | INT DOT2LT INT
+  { `Range { range_begin = $1; range_end = $3; range_open = `Half_open } }
+  | INT DOT3 INT
+  { `Range { range_begin = $1; range_end = $3; range_open = `Closed } }
 
 struct_:
   | HASH_NEW namepath LBRACE key_value_pairs RBRACE

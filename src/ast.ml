@@ -199,8 +199,13 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     add_string "(tuple ";
     write_nodes exps;
     add_rp ()
-  | `Range (start, end_) ->
-    add_string @@ sprintf "(range %d %d)" start.desc end_.desc
+  | `Range range ->
+    add_string @@ sprintf "(range %d%s%d)"
+      range.range_begin.desc
+      (match range.range_open with
+       | `Half_open -> "..<"
+       | `Closed -> "...")
+      range.range_end.desc
   | `Struct str ->
     add_string "{";
     Namepath.iter str.str_namepath ~f:(fun name ->

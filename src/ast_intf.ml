@@ -74,7 +74,7 @@ type t = [
   | `Float of float Located.t
   | `List of t list
   | `Tuple of t list
-  | `Range of (int Located.t * int Located.t)
+  | `Range of range
   | `Struct of t struct_
   | `Enum of (text, t) enum
 ]
@@ -166,6 +166,12 @@ and index = {
   idx_prefix : t;
   idx_index : t;
   mutable idx_type : Type.t option;
+}
+
+and range = {
+  range_begin : int Located.t;
+  range_end : int Located.t;
+  range_open : [`Half_open | `Closed];
 }
 
 and 'a struct_ = {

@@ -74,7 +74,8 @@ rule read =
   | ':'         { COLON }
   | ','         { COMMA }
   | '.'         { DOT }
-  | ".."        { DOT2 }
+  | "..<"       { DOT2LT }
+  | "..."       { DOT3 }
   | '|'         { BAR }
   | '^'         { CARET }
   | '?'         { Q }
