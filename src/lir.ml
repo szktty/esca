@@ -6,10 +6,12 @@ module Register = struct
 
   type id = string
 
+  type name = string
+
   type t = {
     id : id;
     ty : Raw_type.t;
-    scope : [`Param | `Local];
+    scope : [`Param of name | `Temp | `Named of name];
   }
 
   let create ~id ~ty ~scope = { id; ty; scope }
@@ -18,10 +20,16 @@ module Register = struct
     List.map regs ~f:(fun reg -> reg.id)
 
   let params regs =
-    List.filter regs ~f:(fun reg -> reg.scope = `Param)
+    List.filter regs ~f:(fun reg ->
+        match reg.scope with
+        | `Param _ -> true
+        | _ -> false)
 
   let locals regs =
-    List.filter regs ~f:(fun reg -> reg.scope = `Local)
+    List.filter regs ~f:(fun reg ->
+        match reg.scope with
+        | `Param _ -> false
+        | _ -> true)
 
 end
 
@@ -485,9 +493,12 @@ module Program = struct
 
     (* declare variables to avoid "goto" error ("jumps over declaration") *)
     List.iter func.fdef_locals
-      ~f:(fun var ->
-          add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
-            var.id (Raw_type.to_string var.ty) var.id);
+      ~f:(fun local ->
+          match local.scope with
+          | `Temp ->
+            add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
+              local.id (Raw_type.to_string local.ty) local.id
+          | _ -> ());
     add_string buf "\n";
 
     (* block *)
@@ -509,7 +520,6 @@ module Context = struct
     src : string;
     ops : Op.t list;
     locals : Register.t list;
-    local_map : Register.t String.Map.t;
     rc : Register.t;
     flag : Register.id;
     labels : Op.label list;
@@ -518,44 +528,42 @@ module Context = struct
   }
 
   let create src =
-    (* dummy *)
-    let r0 = Register.create ~id:"r0" ~ty:Raw_type.Void ~scope:`Local in
     { src;
       ops = [];
       locals = [];
-      local_map = String.Map.empty;
-      rc = r0;
+      rc = Register.create ~id:"r0" ~ty:Raw_type.Void ~scope:`Temp (* dummy *);
       flag = "fr";
       labels = [];
       main = None;
       polys = [];
     }
 
-  let add_local_map ctx name reg =
-    { ctx with local_map =
-                 String.Map.add ctx.local_map ~key:name ~data:reg }
+  let add_local ctx reg =
+    { ctx with locals = reg :: ctx.locals }
 
-  let add_reg ctx reg =
-    { ctx with locals = reg :: ctx.locals;
-               local_map = String.Map.add ctx.local_map
-                   ~key:reg.id ~data:reg }
-
-  let new_reg ctx ty ~prefix ~scope =
+  let new_local ctx ~ty ~prefix ~scope =
     let n = List.length ctx.locals in
     let id = Printf.sprintf "%s%d" prefix n in
     let reg = Register.create ~id ~ty ~scope in
-    let ctx = add_reg ctx reg in
+    let ctx = add_local ctx reg in
     { ctx with rc = reg }, reg
 
   let new_param ctx ~ty ~name =
-    let ctx, reg = new_reg ctx ty ~prefix:"r" ~scope:`Param in
-    add_local_map ctx name reg, reg
+    new_local ctx ~ty ~prefix:"p" ~scope:(`Param name)
 
-  let new_local ctx ty =
-    new_reg ctx ty ~prefix:"r" ~scope:`Local
+  let new_temp ctx ~ty =
+    new_local ctx ~ty ~prefix:"t" ~scope:`Temp
 
-  let get_local_exn ctx id =
-    String.Map.find_exn ctx.local_map id
+  let new_named ctx ~ty ~name =
+    new_local ctx ~ty ~prefix:"t" ~scope:(`Named name)
+
+  let find_named ctx name =
+    Printf.printf "find named %s %d\n" name (List.length ctx.locals);
+    List.find_exn ctx.locals ~f:(fun local ->
+        match local.scope with
+        | `Named name'
+        | `Param name' -> name = name'
+        | _ -> false)
 
   let set_main ctx reg =
     { ctx with main = Some reg }
@@ -574,11 +582,11 @@ module Context = struct
   let add_op ctx op =
     { ctx with ops = op :: ctx.ops }
 
-  let add_var_op ctx ty ~f =
-    let ctx, reg = new_local ctx ty in
+  let add_temp_op ctx ty ~f =
+    let ctx, reg = new_temp ctx ~ty in
     add_op ctx @@ f reg
 
-  let move ctx from to_ =
+  let move ctx ~from ~to_ =
     add_op ctx @@ Move { mv_from = from; mv_to = to_ }
 
   let finish ctx =
@@ -682,7 +690,7 @@ module Compiler = struct
 
     | For for_ ->
       Printf.printf "LIR: compile for\n";
-      let ctx, var_reg = new_param ctx
+      let ctx, var_reg = new_named ctx
           ~ty:Raw_type.Int
           ~name:for_.for_var.name in
       let ctx = compile_op ctx for_.for_range in
@@ -708,7 +716,7 @@ module Compiler = struct
       let fun_reg = ctx.rc in
       Printf.printf "LIR: call fun %s\n" fun_reg.id;
       let ctx, arg_regs = compile_exps ctx call.call_args in
-      add_var_op ctx (Raw_type.return_ty_exn fun_reg.ty)
+      add_temp_op ctx (Raw_type.return_ty_exn fun_reg.ty)
         ~f:(fun reg -> Call { call_rc = reg;
                               call_fun = fun_reg;
                               call_args = arg_regs })
@@ -720,7 +728,7 @@ module Compiler = struct
       let recv_reg = ctx.rc in
       let ctx, arg_regs = compile_exps ctx call.mcall_args in
       let name = Raw_type.symbol_method recv_reg.ty call.mcall_name in
-      add_var_op ctx (Raw_type.return_ty_exn fun_ty)
+      add_temp_op ctx (Raw_type.return_ty_exn fun_ty)
         ~f:(fun reg -> Methcall { mcall_rc = reg;
                                   mcall_recv = recv_reg;
                                   mcall_name = name;
@@ -740,7 +748,7 @@ module Compiler = struct
         | Gt -> add_op ctx @@ Gt (left_op, right_op)
         | Ge -> add_op ctx @@ Ge (left_op, right_op)
         | _ ->
-          add_var_op ctx (Raw_type.of_type exp.binexp_ty)
+          add_temp_op ctx (Raw_type.of_type exp.binexp_ty)
             ~f:(fun reg -> Binexp { binexp_rc = reg;
                                     binexp_left = left_op;
                                     binexp_op = exp.binexp_op;
@@ -749,22 +757,21 @@ module Compiler = struct
 
     | Prim prim ->
       Printf.printf "LIR: compile prim: %s\n" prim.prim_id;
-      let ctx, reg = new_local ctx (Raw_type.of_type prim.prim_type) in
+      let ctx, reg = new_temp ctx ~ty:(Raw_type.of_type prim.prim_type) in
       add_op ctx @@ Prim {
         prim_rc = reg;
         prim_id = prim.prim_id;
       }
 
     | Var var ->
-      Printf.printf "LIR: compile var: %s\n" var.name;
-      add_var_op ctx (Raw_type.of_type var.ty)
+      add_temp_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Var {
-            var_from = get_local_exn ctx var.name;
+            var_from = find_named ctx var.name;
             var_to = reg })
 
     | Ref var ->
       Printf.printf "LIR: compile ref: %s\n" var.name;
-      add_var_op ctx (Raw_type.of_type var.type_)
+      add_temp_op ctx (Raw_type.of_type var.type_)
         ~f:(fun reg -> Ref {
             ref_path = Value.path var;
             ref_to = reg })
@@ -773,7 +780,7 @@ module Compiler = struct
       Printf.printf "LIR: compile poly: %s\n" (Namepath.to_string fn.poly_path);
       let raw_ty = Raw_type.of_type fn.poly_type in
       let ctx, box = add_poly ctx fn.poly_path raw_ty in
-      add_var_op ctx raw_ty 
+      add_temp_op ctx raw_ty 
         ~f:(fun reg -> Poly {
             poly_path = fn.poly_path;
             poly_box = box;
@@ -782,7 +789,7 @@ module Compiler = struct
     | Ref_fun var ->
       Printf.printf "LIR: compile ref fun: %s\n" var.name;
       Printf.printf "type = %s\n" (Type.to_string var.ty);
-      add_var_op ctx (Raw_type.of_type var.ty)
+      add_temp_op ctx (Raw_type.of_type var.ty)
         ~f:(fun reg -> Ref_fun {
             ref_fun_from = var.name;
             ref_fun_to = reg;
@@ -793,7 +800,7 @@ module Compiler = struct
         prop.ref_prop_name (Type.to_string prop.ref_prop_ty);
       let ctx = compile_op ctx prop.ref_prop_obj in
       let obj_reg = ctx.rc in
-      add_var_op ctx (Raw_type.of_type prop.ref_prop_ty)
+      add_temp_op ctx (Raw_type.of_type prop.ref_prop_ty)
         ~f:(fun reg -> Ref_prop {
             ref_prop_from = obj_reg;
             ref_prop_name = prop.ref_prop_name;
@@ -801,12 +808,12 @@ module Compiler = struct
 
     | Int value ->
       Printf.printf "LIR: compile int\n";
-      add_var_op ctx Raw_type.Int
+      add_temp_op ctx Raw_type.Int
         ~f:(fun reg -> Int (reg, value))
 
     | String value ->
       Printf.printf "LIR: compile string\n";
-      add_var_op ctx Raw_type.String
+      add_temp_op ctx Raw_type.String
         ~f:(fun reg -> String (reg, value))
 
     | Range range ->
@@ -815,7 +822,7 @@ module Compiler = struct
       let begin_op = ctx.rc in
       let ctx = compile_op ctx range.range_end in
       let end_op = ctx.rc in
-      add_var_op ctx Raw_type.Range
+      add_temp_op ctx Raw_type.Range
         ~f:(fun reg -> Range {
             range_to = reg;
             range_begin = begin_op;
