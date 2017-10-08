@@ -421,8 +421,30 @@ rev_arg_list:
   | rev_arg_list COMMA exp { $3 :: $1 }
 
 fun_exp:
-  | LBRACE block RBRACE { Ast.nop }
-  | LBRACE param_list_body IN block RBRACE { Ast.nop }
+  | LBRACE block RBRACE
+  { `Fun {
+        fun_params = [];
+        fun_ret = None;
+        fun_block = $2;
+        fun_type = None;
+    }
+  }
+  | LBRACE param_list_body IN block RBRACE
+  { `Fun {
+        fun_params = $2;
+        fun_ret = None;
+        fun_block = $4;
+        fun_type = None;
+    }
+  }
+  | LBRACE param_list_body RARROW type_exp IN block RBRACE
+  { `Fun {
+        fun_params = $2;
+        fun_ret = Some $4;
+        fun_block = $6;
+        fun_type = None;
+    }
+  }
 
 bin_exp:
   | exp PLUS exp { create_binexp $1 $2 `Add $3 }

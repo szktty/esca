@@ -220,6 +220,16 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
             write v);
         add_string ", ");
     add_string "}"
+  | `Fun fn ->
+    add_string "(fun ";
+    write_texts fn.fun_params;
+    add_space ();
+    Option.iter fn.fun_ret
+      ~f:(fun ty ->
+          write_tyexp buf ty;
+          add_space ());
+    write_nodes fn.fun_block;
+    add_string ")"
   | _ -> failwith "not supported"
 
 and write_ptn buf ptn =

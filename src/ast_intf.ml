@@ -77,6 +77,7 @@ type t = [
   | `Range of range
   | `Struct of t struct_
   | `Enum of (text, t) enum
+  | `Fun of fun_
 ]
 
 and chunk = {
@@ -184,6 +185,13 @@ and ('name, 'value) enum = {
   enum_name : 'name;
   enum_params : ('name option * 'value);
   mutable enum_type : Type.t option;
+}
+
+and fun_ = {
+  fun_params : text list;
+  fun_ret : tyexp option;
+  fun_block : t list;
+  mutable fun_type : Type.t option;
 }
 
 and binexp = {
