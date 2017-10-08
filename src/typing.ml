@@ -470,65 +470,6 @@ let rec infer (e:Ast.t)
         unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e2);
         (env, val_ty.desc)
 
-                (*
-    | Not(e) ->
-      unify `Bool (infer ~clos ~env e);
-      `Bool
-    | Neg(e) ->
-      unify `Int (infer ~clos ~env e);
-      `Int
-    | FNeg(e) ->
-      unify `Float (infer ~clos ~env e);
-      `Float
-    | FAdd(e1, e2) | FSub(e1, e2) | FMul(e1, e2) | FDiv(e1, e2) ->
-      unify `Float (infer ~clos ~env e1);
-      unify `Float (infer ~clos ~env e2);
-      `Float
-    | Eq(e1, e2) | LE(e1, e2) ->
-      unify (infer ~clos ~env e1) (infer env e2);
-      `Bool
-    | If(e1, e2, e3) ->
-      unify (infer ~clos ~env e1) `Bool;
-      let t2 = infer ~clos ~env e2 in
-      let t3 = infer ~clos ~env e3 in
-      unify t2 t3;
-      t2
-    | Let((x, t), e1, e2) -> (* let¤Î·¿¿äÏÀ (caml2html: typing_let) *)
-      unify t (infer ~clos ~env e1);
-      g (M.add x t env) e2
-    | Var(x) when M.mem x env -> M.find x env (* ÊÑ¿ô¤Î·¿¿äÏÀ (caml2html: typing_var) *)
-    | Var(x) when M.mem x !extenv -> M.find x !extenv
-    | Var(x) -> (* ³°ÉôÊÑ¿ô¤Î·¿¿äÏÀ (caml2html: typing_extvar) *)
-      Format.eprintf "free variable %s assumed as external@." x;
-      let t = `gentyp () in
-      extenv := M.add x t !extenv;
-      t
-    | LetRec({ name = (x, t); args = yts; body = e1 }, e2) -> (* let rec¤Î·¿¿äÏÀ (caml2html: typing_letrec) *)
-      let env = M.add x t env in
-      unify t (`Fun(List.map snd yts, g (M.add_list yts env) e1));
-      infer ~clos ~env e2
-    | App(e, es) -> (* ´Ø¿ôÅ¬ÍÑ¤Î·¿¿äÏÀ (caml2html: typing_app) *)
-      let t = `gentyp () in
-      unify (infer ~clos ~env e) (`Fun(List.map (infer env) es, t));
-      t
-    | Tuple(es) -> `Tuple(List.map (infer ~clos ~env) es)
-    | LetTuple(xts, e1, e2) ->
-      unify (`Tuple(List.map snd xts)) (infer ~clos ~env e1);
-      g (M.add_list xts env) e2
-    | Array(e1, e2) -> (* must be a primitive for "polymorphic" typing *)
-      unify (infer ~clos ~env e1) `Int;
-      `Array(infer ~clos ~env e2)
-    | Get(e1, e2) ->
-      let t = `gentyp () in
-      unify (`Array(t)) (infer ~clos ~env e1);
-      unify `Int (infer ~clos ~env e2);
-      t
-    | Put(e1, e2, e3) ->
-      let t = infer ~clos ~env e3 in
-      unify (`Array(t)) (infer ~clos ~env e1);
-      unify `Int (infer ~clos ~env e2);
-      `Void
-       *)
       | _ -> Ast.print e; failwith "TODO"
     in
     let ty = Type.create (Some loc) desc in
