@@ -77,7 +77,7 @@ module Op = struct
     | Label of label
 
     | For of Register.t * Register.t
-    | End
+    | End_for
 
     | Call of call
     | Methcall of method_call
@@ -379,8 +379,8 @@ module Program = struct
       addln @@ sprintf "for %s := %s.Begin; %s < %s.End; %s++ {"
         var.id range.id var.id range.id var.id
 
-    | End ->
-      addln "}"
+    | End_for ->
+      addln "} // for"
 
     | Call call ->
       Printf.printf "call\n";
@@ -697,7 +697,7 @@ module Compiler = struct
       let range_reg = ctx.rc in
       let ctx = add_op ctx @@ For (var_reg, range_reg) in
       let ctx = compile_block ctx for_.for_block in
-      add_op ctx @@ End
+      add_op ctx @@ End_for
 
     | Return ret ->
       Printf.printf "LIR: compile return\n";
