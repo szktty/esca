@@ -55,6 +55,18 @@ func add(x: Int, y: Int) {
 
 #### Anonymous Functions
 
+
+```
+// no arguments
+{ print("hello") }
+
+// no return
+{ x, y in show(x + y) }
+
+// return
+{ x, y in return x + y }
+```
+
 ### Contral Flow
 
 #### Conditional
