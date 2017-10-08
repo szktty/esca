@@ -470,7 +470,11 @@ let rec infer (e:Ast.t)
         unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e2);
         (env, val_ty.desc)
 
+      | `Fun fn ->
+        infer_fun_body fn.fun_body ~env ~loc ~block_type:Type.void
+
       | _ -> Ast.print e; failwith "TODO"
+
     in
     let ty = Type.create (Some loc) desc in
     Printf.printf "inferred node: ";
@@ -491,6 +495,55 @@ and easy_infer (e:Ast.t) ~clos ~env : Type.t =
 and infer_block es ~clos ~env =
   List.fold_left es ~init:(env, Type.void)
     ~f:(fun (env, _) e -> infer e ~clos ~env)
+
+and infer_fun_body
+    ?(name:string option)
+    (body:Ast.fun_body)
+    ~env
+    ~loc
+    ~block_type
+  : Env.t * Type.desc =
+  (* parameters *)
+  let fenv, param_tys =
+    List.fold_right body.fbody_params
+      ~init:(env, [])
+      ~f:(fun param (env, tys) ->
+          let ty = Type.metavar param.loc in
+          Env.add env (Value.local_value param.desc ~type_:ty), ty :: tys)
+  in
+
+  (* return type *)
+  let ret_ty = match body.fbody_ret with
+    | None -> block_type
+    | Some exp ->
+      Printf.printf "find type: ";
+      Ast.print_tyexp exp;
+      match Tyexp.to_type fenv exp with
+      | None -> failwith "type not found"
+      | Some ty -> ty
+  in
+  let clos' = Closure.create () in
+  clos'.ret_ty <- Some ret_ty;
+
+  (* generate function type *)
+  let fun_ty = Type.fun_ (Some loc) param_tys ret_ty in
+  unify ~ex:body.fbody_type ~ac:fun_ty;
+
+  (* add the function to environment for recursive call *)
+  let fenv = match name with
+    | None -> fenv
+    | Some name ->
+      let fun_var = Value.local name
+          ~kind:`Value
+          ~type_:fun_ty in
+      Env.add fenv fun_var
+  in
+
+  (* block *)
+  let _, ret_ty' = infer_block body.fbody_block ~clos:clos' ~env:fenv in
+  unify ~ex:ret_ty ~ac:ret_ty';
+
+  (env, (generalize fun_ty).desc)
 
 and infer_sw_cls ~clos ~env match_ty val_ty (cls:Ast.switch_cls) =
   (* pattern *)

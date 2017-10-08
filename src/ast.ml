@@ -53,6 +53,19 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
   let write_nodes es = write_list buf es ~f:write in
   let write_text text = add_string ("\"" ^ text.desc ^ "\"") in
   let write_texts es = write_list buf es ~f:write_text in
+
+  let write_fun_body buf (body:fun_body) =
+    add_lp ();
+    write_texts body.fbody_params;
+    add_space ();
+    Option.iter body.fbody_ret
+      ~f:(fun ty ->
+          write_tyexp buf ty;
+          add_space ());
+    write_nodes body.fbody_block;
+    add_rp ()
+  in
+
   match node with
   | `Nop _ -> add_string "nop"
   | `Chunk chunk ->
@@ -222,13 +235,7 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     add_string "}"
   | `Fun fn ->
     add_string "(fun ";
-    write_texts fn.fun_params;
-    add_space ();
-    Option.iter fn.fun_ret
-      ~f:(fun ty ->
-          write_tyexp buf ty;
-          add_space ());
-    write_nodes fn.fun_block;
+    write_fun_body buf fn.fun_body;
     add_string ")"
   | _ -> failwith "not supported"
 

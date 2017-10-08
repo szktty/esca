@@ -110,6 +110,13 @@ and fundef = {
   fdef_type : Type.t;
 }
 
+and fun_body = {
+  fbody_params : text list;
+  fbody_ret : tyexp option;
+  fbody_block : t list;
+  fbody_type : Type.t;
+}
+
 and strdef = {
   sdef_name : text;
   sdef_fields : sdef_field list;
@@ -188,10 +195,7 @@ and ('name, 'value) enum = {
 }
 
 and func = {
-  fun_params : text list;
-  fun_ret : tyexp option;
-  fun_block : t list;
-  fun_type : Type.t;
+  fun_body : fun_body;
 }
 
 and binexp = {

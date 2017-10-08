@@ -426,26 +426,32 @@ rev_arg_list:
 fun_exp:
   | LBRACE block RBRACE
   { `Fun {
-        fun_params = [];
-        fun_ret = None;
-        fun_block = $2;
-        fun_type = Type.metavar None;
+        fun_body = {
+            fbody_params = [];
+            fbody_ret = None;
+            fbody_block = $2;
+            fbody_type = Type.metavar None;
+        }
     }
   }
   | LBRACE param_list_body IN block RBRACE
   { `Fun {
-        fun_params = $2;
-        fun_ret = None;
-        fun_block = $4;
-        fun_type = Type.metavar None;
+        fun_body = {
+            fbody_params = $2;
+            fbody_ret = None;
+            fbody_block = $4;
+            fbody_type = Type.metavar None;
+        }
     }
   }
   | LBRACE param_list_body RARROW type_exp IN block RBRACE
   { `Fun {
-        fun_params = $2;
-        fun_ret = Some $4;
-        fun_block = $6;
-        fun_type = Type.metavar None;
+        fun_body = {
+            fbody_params = $2;
+            fbody_ret = Some $4;
+            fbody_block = $6;
+            fbody_type = Type.metavar None;
+        }
     }
   }
 
