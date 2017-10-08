@@ -422,8 +422,7 @@ rev_arg_list:
 
 fun_exp:
   | LBRACE block RBRACE { Ast.nop }
-  | LBRACE BAR BAR block RBRACE { Ast.nop }
-  | LBRACE BAR param_list_body BAR block RBRACE { Ast.nop }
+  | LBRACE param_list_body IN block RBRACE { Ast.nop }
 
 bin_exp:
   | exp PLUS exp { create_binexp $1 $2 `Add $3 }
