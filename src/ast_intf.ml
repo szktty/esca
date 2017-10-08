@@ -77,7 +77,7 @@ type t = [
   | `Range of range
   | `Struct of t struct_
   | `Enum of (text, t) enum
-  | `Fun of fun_
+  | `Fun of func
 ]
 
 and chunk = {
@@ -187,7 +187,7 @@ and ('name, 'value) enum = {
   enum_type : Type.t;
 }
 
-and fun_ = {
+and func = {
   fun_params : text list;
   fun_ret : tyexp option;
   fun_block : t list;
