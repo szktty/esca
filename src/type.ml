@@ -45,11 +45,11 @@ and primitive = {
 let create loc desc =
   Located.create loc desc
 
-let create_metavar loc =
+let metavar loc =
   Located.create loc (`Meta (ref None))
 
-let create_metavar_some loc =
-  create_metavar (Some loc)
+let metavar_some loc =
+  metavar (Some loc)
 
 let var_names = [|
   "a"; "b"; "c"; "d"; "e"; "f"; "g"; "h"; "i"; "j"; "k"; "l"; "m"; "n";
