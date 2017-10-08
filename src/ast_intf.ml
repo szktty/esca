@@ -87,13 +87,13 @@ and chunk = {
 
 and exp = {
   exp : t;
-  mutable exp_type : Type.t option;
+  exp_type : Type.t;
 }
 
 and assign = {
   asg_var : t;
   asg_exp : t;
-  mutable asg_type : Type.t option;
+  asg_type : Type.t;
 }
 
 and vardef = {
@@ -107,32 +107,32 @@ and fundef = {
   fdef_params : text list;
   fdef_ret : tyexp option;
   fdef_block : t list;
-  mutable fdef_type : Type.t option;
+  fdef_type : Type.t;
 }
 
 and strdef = {
   sdef_name : text;
   sdef_fields : sdef_field list;
-  mutable sdef_type : Type.t option;
+  sdef_type : Type.t;
 }
 
 and sdef_field = {
   sdef_field_name : text;
   sdef_field_tyexp : tyexp;
-  mutable sdef_field_type : Type.t option;
+  sdef_field_type : Type.t;
 }
 
 and var = {
   var_prefix : t option;
   var_name : text;
-  mutable var_type : Type.t option; (* TODO: deprecated *)
-  mutable var_val : Value.t option;
+  var_type : Type.t;
+  mutable var_value : Value.t option;
 }
 
 and if_ = {
   if_actions : (t * t list) list;
   if_else : t list;
-  mutable if_type : Type.t option;
+  if_type : Type.t;
 }
 
 and for_ = {
@@ -145,8 +145,8 @@ and switch = {
   sw_val : t;
   sw_cls : switch_cls list;
   sw_default : t list option;
-  mutable sw_val_type : Type.t option;
-  mutable sw_cls_type : Type.t option;
+  sw_val_type : Type.t;
+  sw_cls_type : Type.t;
 }
 
 and switch_cls = {
@@ -154,19 +154,19 @@ and switch_cls = {
   sw_cls_ptn : pattern;
   sw_cls_guard : t option;
   sw_cls_action : t list;
-  mutable sw_cls_act_type : Type.t option;
+  sw_cls_act_type : Type.t;
 }
 
 and funcall = {
   fc_fun : t;
   fc_args : t list;
-  mutable fc_fun_type : Type.t option;
+  fc_fun_type : Type.t;
 }
 
 and index = {
   idx_prefix : t;
   idx_index : t;
-  mutable idx_type : Type.t option;
+  idx_type : Type.t;
 }
 
 and range = {
@@ -178,38 +178,38 @@ and range = {
 and 'a struct_ = {
   str_namepath : text Namepath.t;
   str_fields : (text * 'a option) list;
-  mutable str_type : Type.t option;
+  str_type : Type.t;
 }
 
 and ('name, 'value) enum = {
   enum_name : 'name;
   enum_params : ('name option * 'value);
-  mutable enum_type : Type.t option;
+  enum_type : Type.t;
 }
 
 and fun_ = {
   fun_params : text list;
   fun_ret : tyexp option;
   fun_block : t list;
-  mutable fun_type : Type.t option;
+  fun_type : Type.t;
 }
 
 and binexp = {
   binexp_left : t;
   binexp_op : op;
   binexp_right : t;
-  mutable binexp_type : Type.t option;
+  binexp_type : Type.t;
 }
 
 and unexp = {
   unexp_op : op;
   unexp_exp : t;
-  mutable unexp_type : Type.t option;
+  unexp_type : Type.t;
 }
 
 and pattern = {
   ptn_cls : ptn_cls;
-  mutable ptn_type : Type.t option;
+  ptn_type : Type.t;
 }
 
 and ptn_cls = [
@@ -231,4 +231,5 @@ and ptn_cls = [
 let nop : t = `Nop Location.zero
 
 let ptn_nop : pattern =
-  { ptn_cls = `Nop Location.zero; ptn_type = None }
+  { ptn_cls = `Nop Location.zero;
+    ptn_type = Type.metavar_some Location.zero }

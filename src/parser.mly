@@ -9,11 +9,14 @@ let create_binexp left op_loc op right =
         binexp_left = left;
         binexp_op = op;
         binexp_right = right;
-        binexp_type = None }
+        binexp_type = Type.metavar_some op_loc }
 
 let create_unexp op_loc op exp =
   let op = create (Some op_loc) op in
-  `Unexp { unexp_op = op; unexp_exp = exp; unexp_type = None }
+  `Unexp {
+        unexp_op = op;
+        unexp_exp = exp;
+        unexp_type = Type.metavar_some op_loc }
 
 %}
 
@@ -174,7 +177,7 @@ stat:
   | vardef { $1 }
   | fundef { $1 }
   | var EQ exp (* TODO: exp_list *)
-  { `Assign { asg_var = $1; asg_exp = $3; asg_type = None } }
+  { `Assign { asg_var = $1; asg_exp = $3; asg_type = Type.metavar None } }
   | LBRACE block RBRACE { `Block $2 }
   | FOR IDENT IN exp LBRACE block RBRACE
   { `For { for_var = $2; for_range = $4; for_block = $6 } }
@@ -208,7 +211,7 @@ struct_def:
   | STRUCT IDENT LBRACE field_def_list RBRACE
   { `Strdef { sdef_name = $2;
       sdef_fields = $4;
-      sdef_type = None;
+      sdef_type = Type.metavar None;
     }
   }
 
@@ -224,7 +227,7 @@ field_def:
   | IDENT COLON type_exp
   { { sdef_field_name = $1;
       sdef_field_tyexp = $3;
-      sdef_field_type = None;
+      sdef_field_type = Type.metavar None;
     }
   }
 
@@ -264,7 +267,7 @@ fundef:
         fdef_params = [];
         fdef_ret = None;
         fdef_block = $4;
-        fdef_type = None;
+        fdef_type = Type.metavar None;
     }
   }
   | FUNC var_name param_list LBRACE block RBRACE
@@ -274,7 +277,7 @@ fundef:
         fdef_params = $3;
         fdef_ret = None;
         fdef_block = $5;
-        fdef_type = None;
+        fdef_type = Type.metavar None;
     }
   }
   | FUNC var_name param_list RARROW type_exp LBRACE block RBRACE
@@ -284,7 +287,7 @@ fundef:
         fdef_params = $3;
         fdef_ret = Some $5;
         fdef_block = $7;
-        fdef_type = None;
+        fdef_type = Type.metavar None;
     }
   }
 
@@ -309,28 +312,28 @@ if_stat:
       `If {
           if_actions = [($2, $4)];
           if_else = [];
-          if_type = None }
+          if_type = Type.metavar None }
   }
   | IF exp LBRACE block RBRACE elseif_block
   {
       `If {
           if_actions = ($2, $4) :: $6;
           if_else = [];
-          if_type = None }
+          if_type = Type.metavar None }
   }
   | IF exp LBRACE block RBRACE ELSE LBRACE block RBRACE
   {
       `If {
           if_actions = [($2, $4)];
           if_else = $8;
-          if_type = None }
+          if_type = Type.metavar None }
   }
   | IF exp LBRACE block RBRACE elseif_block ELSE LBRACE block RBRACE
   {
       `If {
           if_actions = ($2, $4) :: $6;
           if_else = $9;
-          if_type = None }
+          if_type = Type.metavar None }
   }
 
 elseif_block:
@@ -349,16 +352,16 @@ switch_stat:
         sw_val = $2;
         sw_cls = $4;
         sw_default = None;
-        sw_val_type = None;
-        sw_cls_type = None; }
+        sw_val_type = Type.metavar None;
+        sw_cls_type = Type.metavar None; }
   }
   | SWITCH exp LBRACE sw_clause_list DEFAULT COLON block RBRACE
   { `Switch {
         sw_val = $2;
         sw_cls = $4;
         sw_default = Some $7;
-        sw_val_type = None;
-        sw_cls_type = None; }
+        sw_val_type = Type.metavar None;
+        sw_cls_type = Type.metavar None; }
   }
 
 sw_clause_list:
@@ -374,13 +377,13 @@ sw_clause:
       sw_cls_ptn = fst $2;
       sw_cls_guard = snd $2;
       sw_cls_action = $4;
-      sw_cls_act_type = None } }
+      sw_cls_act_type = Type.metavar None } }
   | CASE IDENT EQ sw_pattern COLON block
   { { Ast.sw_cls_var = Some $2;
       sw_cls_ptn = fst $4;
       sw_cls_guard = snd $4;
       sw_cls_action = $6;
-      sw_cls_act_type = None } }
+      sw_cls_act_type = Type.metavar None } }
 
 sw_pattern:
   | pattern { ($1, None) }
@@ -391,20 +394,20 @@ funcall:
   { nop }
   | simple_exp paren_arg_list
   {
-    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None }
+    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = Type.metavar None }
   }
   | LPAREN exp RPAREN paren_arg_list
   {
-    `Funcall { fc_fun = $2; fc_args = $4; fc_fun_type = None }
+    `Funcall { fc_fun = $2; fc_args = $4; fc_fun_type = Type.metavar None }
   }
   | LPAREN exp COLON type_exp RPAREN paren_arg_list
   {
     (* TODO *)
-    `Funcall { fc_fun = $2; fc_args = $6; fc_fun_type = None }
+    `Funcall { fc_fun = $2; fc_args = $6; fc_fun_type = Type.metavar None }
   }
   | funcall paren_arg_list
   {
-    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = None }
+    `Funcall { fc_fun = $1; fc_args = $2; fc_fun_type = Type.metavar None }
   }
 
 paren_arg_list:
@@ -426,7 +429,7 @@ fun_exp:
         fun_params = [];
         fun_ret = None;
         fun_block = $2;
-        fun_type = None;
+        fun_type = Type.metavar None;
     }
   }
   | LBRACE param_list_body IN block RBRACE
@@ -434,7 +437,7 @@ fun_exp:
         fun_params = $2;
         fun_ret = None;
         fun_block = $4;
-        fun_type = None;
+        fun_type = Type.metavar None;
     }
   }
   | LBRACE param_list_body RARROW type_exp IN block RBRACE
@@ -442,7 +445,7 @@ fun_exp:
         fun_params = $2;
         fun_ret = Some $4;
         fun_block = $6;
-        fun_type = None;
+        fun_type = Type.metavar None;
     }
   }
 
@@ -497,18 +500,18 @@ var:
   { `Var {
         var_prefix = None;
         var_name = $1;
-        var_type = None;
-        var_val = None }
+        var_type = Type.metavar None;
+        var_value = None }
   }
   | simple_exp DOT var_name
   { `Var {
         var_prefix = Some $1;
         var_name = $3;
-        var_type = None;
-        var_val = None }
+        var_type = Type.metavar None;
+        var_value = None }
   }
   | var LBRACK exp RBRACK
-  { `Index { idx_prefix = $1; idx_index = $3; idx_type = None } }
+  { `Index { idx_prefix = $1; idx_index = $3; idx_type = Type.metavar None } }
 
 var_name:
   | IDENT { $1 }
@@ -550,7 +553,7 @@ struct_:
   { `Struct {
       str_namepath = $2;
       str_fields = $4;
-      str_type = None }
+      str_type = Type.metavar None }
   }
 
 key_value_pairs:
@@ -566,7 +569,7 @@ key_value_pair:
 
 pattern:
   | LPAREN pattern RPAREN { $2 }
-  | pattern_clause { { ptn_cls = $1; ptn_type = None } }
+  | pattern_clause { { ptn_cls = $1; ptn_type = Type.metavar None } }
 
 pattern_clause:
   | LPAREN RPAREN { `Void $1 }

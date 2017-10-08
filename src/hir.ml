@@ -310,11 +310,11 @@ module Compiler = struct
       let fun_ctx, fun_var =
         match def.fdef_name.desc with
         | "main" -> fun_ctx, main_fun
-        | _ -> new_var fun_ctx @@ Option.value_exn def.fdef_type
+        | _ -> new_var fun_ctx def.fdef_type
       in 
 
       (* parameters *)
-      let param_tys = Type.fun_params @@ Option.value_exn def.fdef_type in
+      let param_tys = Type.fun_params def.fdef_type in
       let fun_ctx, rev_params =
         List.fold2_exn def.fdef_params param_tys
           ~init:(fun_ctx, [])
@@ -329,7 +329,7 @@ module Compiler = struct
       let ctx' = add_var ctx fun_var in
       ctx', Fundef {
         fdef_var = fun_var;
-        fdef_ty = Option.value_exn def.fdef_type;
+        fdef_ty = def.fdef_type;
         fdef_name = def.fdef_name.desc;
         fdef_params = params;
         fdef_block = block;
@@ -441,11 +441,11 @@ module Compiler = struct
     | `Var var ->
       let name = var.var_name.desc in
       Printf.printf "HIR: compile var '%s'\n" name;
-      Option.iter var.var_val
+      Option.iter var.var_value
         ~f:(fun value ->
             Printf.printf "HIR: var = %s\n" (Value.to_string value));
 
-      let desc = Option.value_exn var.var_val in
+      let desc = Option.value_exn var.var_value in
       begin match desc with
         | { scope = `Module path;
             type_ = { desc = `Poly { contents = `Unify ty } };
@@ -460,7 +460,7 @@ module Compiler = struct
         | { scope = `Module _ } ->
           ctx, Ref desc
         | _ ->
-          let ty = Type.unwrap @@ Option.value_exn var.var_type in
+          let ty = Type.unwrap var.var_type in
           begin match Type.prim_id ty with
             | Some id ->
               ctx, Prim { prim_id = id; prim_type = ty }

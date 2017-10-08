@@ -313,13 +313,13 @@ let print_tyexp node =
 let rec type_ (node:t) =
   match node with
   | `Funcall call ->
-    Some (Type.fun_return (Option.value_exn call.fc_fun_type))
+    Some (Type.fun_return call.fc_fun_type)
   | `Binexp exp ->
     begin match exp.binexp_op.desc with
       | `Eq | `Ne | `Lt | `Le | `Gt | `Ge -> Some Type.bool
       | _ -> type_ exp.binexp_left
     end
-  | `Var var -> Some (Option.value_exn var.var_type)
+  | `Var var -> Some (Option.value_exn var.var_value).type_
   | `Bool _ -> Some Type.bool
   | `Int _ -> Some Type.int
   | `String _ -> Some Type.string

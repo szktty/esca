@@ -349,7 +349,8 @@ let rec infer (e:Ast.t)
         clos'.ret_ty <- Some ret;
 
         let fun_ty = Type.fun_ (Some loc) params ret in
-        fdef.fdef_type <- Some fun_ty;
+        unify ~ex:fdef.fdef_type ~ac:fun_ty;
+
         (* for recursive call *)
         let fun_var = Value.local fdef.fdef_name.desc
             ~kind:`Value
@@ -369,7 +370,8 @@ let rec infer (e:Ast.t)
         Printf.printf "# funcall ";
         Ast.print e;
         let ex_fun = easy_infer ~clos ~env call.fc_fun in
-        call.fc_fun_type <- Some ex_fun;
+        unify ~ex:call.fc_fun_type ~ac:ex_fun;
+
         Printf.printf "# funcall infer ex: %s\n" (Type.to_string ex_fun);
 
         if Type.equal ex_fun Type.fun_printf then begin
@@ -422,7 +424,7 @@ let rec infer (e:Ast.t)
                     | None -> failwith ("module attribute is not found: " ^ aname)
                     | Some attr ->
                       Module.use m;
-                      var.var_val <- Some attr;
+                      var.var_value <- Some attr;
                       attr.type_
                 end
               | _ ->
@@ -434,10 +436,10 @@ let rec infer (e:Ast.t)
             match Env.find env name with
             | None -> failwith ("variable is not found: " ^ name)
             | Some attr ->
-              var.var_val <- Some attr;
+              var.var_value <- Some attr;
               attr.type_
         in
-        var.var_type <- Some ty;
+        unify ~ex:var.var_type ~ac:ty;
         env, ty.desc
 
       | `Unexp exp ->
