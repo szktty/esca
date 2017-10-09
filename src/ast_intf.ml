@@ -218,7 +218,6 @@ and pattern = {
 
 and ptn_cls = [
   | `Nop of Location.t (* internal use *)
-  | `Void of Location.t
   | `Bool of bool Located.t
   | `String of string Located.t
   | `Int of int Located.t

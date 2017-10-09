@@ -251,7 +251,6 @@ and write_ptn buf ptn =
   let write_ptns es = write_list buf es ~f:write in
   let write_texts es = write_list buf es ~f:(fun e -> add_string e.desc) in
   match ptn.ptn_cls with
-  | `Void _ -> add_string "()"
   | `Bool { desc = true } -> add_string "true"
   | `Bool { desc = false } -> add_string "false"
   | `Int v -> add_string @@ sprintf "%d" v.desc

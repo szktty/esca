@@ -316,9 +316,12 @@ module Program = struct
     add_string buf @@ sprintf "var %s %s\n" name (Raw_type.to_decl ty);
     add_string buf @@ sprintf "var _ = %s\n" name
 
-  and with_exp buf name ~f =
+  and with_exp buf (reg:Register.t) ~f =
     let open Buffer in
-    add_string buf @@ sprintf "%s = " name;
+    begin match reg.ty with
+      | Void -> ()
+      | _ -> add_string buf @@ sprintf "%s = " reg.id
+    end;
     f buf;
     add_string buf @@ sprintf "\n"
 
@@ -400,7 +403,7 @@ module Program = struct
 
     | Call call ->
       Printf.printf "call\n";
-      with_exp buf call.call_rc.id
+      with_exp buf call.call_rc
         ~f:(fun _ ->
             add call.call_fun.id;
             add "(";
@@ -410,7 +413,7 @@ module Program = struct
     | Methcall call ->
       Printf.printf "method call\n";
       let args = call.mcall_recv :: call.mcall_args in
-      with_exp buf call.mcall_rc.id
+      with_exp buf call.mcall_rc
         ~f:(fun _ ->
             add call.mcall_name;
             add "(";
@@ -424,14 +427,14 @@ module Program = struct
         | Sub -> "-"
         | _ -> failwith "not impl"
       in
-      with_exp buf exp.binexp_rc.id
+      with_exp buf exp.binexp_rc
         ~f:(fun _ ->
             add @@ sprintf "%s %s %s" exp.binexp_left.id
               op exp.binexp_right.id)
 
     | Prim prim ->
       let bridge = bridge_prim_id prim.prim_id in
-      with_exp buf prim.prim_rc.id ~f:(fun _ -> add bridge)
+      with_exp buf prim.prim_rc ~f:(fun _ -> add bridge)
 
     | Var var ->
       addln @@ sprintf "%s = %s" var.var_to.id var.var_from.id
@@ -456,16 +459,16 @@ module Program = struct
     | Null -> add "null"
 
     | Void reg ->
-      with_exp buf reg.id ~f:(fun _ -> add "Void{}")
+      with_exp buf reg ~f:(fun _ -> add "Void{}")
 
     | Int (reg, value) ->
-      with_exp buf reg.id ~f:(fun _ -> add @@ sprintf "%d" value)
+      with_exp buf reg ~f:(fun _ -> add @@ sprintf "%d" value)
 
     | String (reg, value) ->
-      with_exp buf reg.id ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
+      with_exp buf reg ~f:(fun _ -> add @@ sprintf "\"%s\"" value)
 
     | Range range ->
-      with_exp buf range.range_to.id ~f:(fun _ ->
+      with_exp buf range.range_to ~f:(fun _ ->
           let fname =
             match range.range_kind with
             | `Closed -> "CreateClosedRange"
@@ -519,8 +522,12 @@ module Program = struct
       ~f:(fun local ->
           match local.scope with
           | `Temp ->
-            add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
-              local.id (Raw_type.to_decl local.ty) local.id
+            begin match local.ty with
+              | Void -> ()
+              | _ ->
+                add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
+                  local.id (Raw_type.to_decl local.ty) local.id
+            end
           | _ -> ());
     add_string buf "\n";
 
