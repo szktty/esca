@@ -96,7 +96,7 @@ module Op = struct
     | Float of float
     | String of Register.t * string
     | Range of range
-    | Fun of closure
+    | Fun of Register.t * closure
 
   and context = {
     ctx_src : string;
@@ -477,6 +477,10 @@ module Program = struct
             range.range_begin.id
             range.range_end.id)
 
+    | Fun (reg, clos) ->
+      addln @@ sprintf "%s = " reg.id;
+      write_clos buf clos
+
     | _ -> ()
 
   and write_ops buf ops =
@@ -852,6 +856,12 @@ module Compiler = struct
             range_begin = begin_op;
             range_end = end_op;
             range_kind = range.range_kind })
+
+    | Fun clos ->
+      Printf.printf "LIR: compile anon fun\n";
+      let ctx, l_clos = compile_clos ctx clos in
+      add_temp_op ctx l_clos.clos_type
+        ~f:(fun reg -> Fun (reg, l_clos))
 
     | _ -> ctx
 
