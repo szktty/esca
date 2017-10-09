@@ -885,7 +885,6 @@ module Compiler = struct
     let open Context in
     match ptn with
     | Ptn_nop -> ctx
-    | Ptn_void -> add_op ctx @@ Eq_void reg
     | Ptn_bool v -> add_op ctx @@ Eq_bool (reg, v)
     | Ptn_int v -> add_op ctx @@ Eq_int (reg, v)
     | Ptn_float v -> add_op ctx @@ Eq_float (reg, v)

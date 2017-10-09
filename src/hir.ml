@@ -89,7 +89,6 @@ module Op = struct
 
   and pattern =
     | Ptn_nop
-    | Ptn_void
     | Ptn_bool of bool
     | Ptn_string of string
     | Ptn_int of int
@@ -562,7 +561,6 @@ module Compiler = struct
 
     match ptn.ptn_cls with
     | `Nop _ -> ctx, Ptn_nop
-    | `Void _ -> ctx, Ptn_void
     | `Bool v -> ctx, Ptn_bool v.desc
     | `Int v -> ctx, Ptn_int v.desc
     | `String v -> ctx, Ptn_string v.desc
