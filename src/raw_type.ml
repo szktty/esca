@@ -49,11 +49,10 @@ let rec of_type (ty:Type.t) : t =
     failwith "of_type: not supported"
 
 let kernel_decl = Printf.sprintf "%sKernel" Go.Name.import_prefix
-let void_decl = Printf.sprintf "%s.Void" kernel_decl
 let range_decl = Printf.sprintf "%s.Range" kernel_decl
 
-let rec to_string = function
-  | Void -> void_decl
+let rec to_decl = function
+  | Void -> ""
   | Bool -> "bool"
   | Uint -> "uint"
   | Uint8 -> "uint8"
@@ -76,16 +75,16 @@ let rec to_string = function
       match args with
       | [] -> ()
       | arg :: [] ->
-        add_string buf @@ to_string arg
+        add_string buf @@ to_decl arg
       | arg :: args ->
-        add_string buf @@ to_string arg;
+        add_string buf @@ to_decl arg;
         add_string buf ", ";
         add_args args
     in
     add_string buf "func (";
     add_args args;
     add_string buf ") ";
-    add_string buf @@ to_string ret;
+    add_string buf @@ to_decl ret;
     contents buf
   | _ -> failwith "not impl"
 
@@ -97,7 +96,6 @@ let return_ty_exn ty =
   Option.value_exn (return_ty ty)
 
 let zero = function
-  | Void -> "Void{}"
   | Bool -> "false"
   | Uint | Uint8 | Uint16 | Uint32 | Uint64
   | Int | Int8 | Int16 | Int32 | Int64 -> "0"

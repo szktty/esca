@@ -284,12 +284,12 @@ module Program = struct
         let _, rev_args =
           List.fold_left args ~init:(0, [])
             ~f:(fun (id, temps) ty ->
-                let temp = sprintf "t%d %s" id (Raw_type.to_string ty) in
+                let temp = sprintf "t%d %s" id (Raw_type.to_decl ty) in
                 id + 1, temp :: temps) in
         let args = List.rev rev_args in
         add_string buf @@ sprintf "(%s) %s {\n"
           (String.concat ~sep:", " args)
-          (Raw_type.to_string ret);
+          (Raw_type.to_decl ret);
 
         (* call function *)
         let _, rev_call_args =
@@ -313,7 +313,7 @@ module Program = struct
 
   and decl_var buf name ty =
     let open Buffer in
-    add_string buf @@ sprintf "var %s %s\n" name (Raw_type.to_string ty);
+    add_string buf @@ sprintf "var %s %s\n" name (Raw_type.to_decl ty);
     add_string buf @@ sprintf "var _ = %s\n" name
 
   and with_exp buf name ~f =
@@ -447,7 +447,7 @@ module Program = struct
       addln @@ sprintf "%s = %s" ref.ref_fun_to.id ref.ref_fun_from
 
     | Ref_prop ref ->
-      Printf.printf "write: ref_prop %s\n" (Raw_type.to_string ref.ref_prop_from.ty);
+      Printf.printf "write: ref_prop %s\n" (Raw_type.to_decl ref.ref_prop_from.ty);
       addln @@ sprintf "%s = %s.%s"
         ref.ref_prop_to.id
         ref.ref_prop_from.id
@@ -503,13 +503,13 @@ module Program = struct
     let params =
       List.map clos.clos_params
         ~f:(fun var ->
-            sprintf "%s %s" var.id (Raw_type.to_string var.ty))
+            sprintf "%s %s" var.id (Raw_type.to_decl var.ty))
       |> String.concat ~sep:", "
     in
     add_string buf @@ sprintf "%s) " params;
 
     (* return value type *)
-    add_string buf @@ sprintf " %s {\n" (Raw_type.to_string ret_ty);
+    add_string buf @@ sprintf " %s {\n" (Raw_type.to_decl ret_ty);
 
     (* define flag variable *)
     decl_var buf flag Raw_type.Bool;
@@ -520,7 +520,7 @@ module Program = struct
           match local.scope with
           | `Temp ->
             add_string buf @@ Printf.sprintf "var %s %s\nvar _ = %s\n"
-              local.id (Raw_type.to_string local.ty) local.id
+              local.id (Raw_type.to_decl local.ty) local.id
           | _ -> ());
     add_string buf "\n";
 

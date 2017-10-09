@@ -578,7 +578,6 @@ pattern:
   | pattern_clause { { ptn_cls = $1; ptn_type = Type.metavar None } }
 
 pattern_clause:
-  | LPAREN RPAREN { `Void $1 }
   | STRING { `String $1 }
   | INT { `Int $1 }
   | FLOAT { `Float $1 }

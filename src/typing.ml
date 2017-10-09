@@ -566,7 +566,7 @@ and infer_sw_cls ~clos ~env match_ty val_ty (cls:Ast.switch_cls) =
 
 and infer_ptn ~clos ~env (ptn:Ast.pattern) =
   match ptn.ptn_cls with
-  | `Nop _ | `Void _ -> (env, Type.void)
+  | `Nop _ -> (env, Type.void)
   | `Bool _ -> (env, Type.bool)
   | `Int _ -> (env, Type.int)
   | `Float _ -> (env, Type.float)
