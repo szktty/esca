@@ -55,9 +55,9 @@ module Op = struct
     | Float of float
     | List of t list
     | Range of range
+    | Fun of closure
 
   and fundef = {
-    fdef_var : Id.t; (* TODO: need? *)
     fdef_ty : Type.t;
     fdef_name : string;
     fdef_params : Id.t list;
@@ -161,30 +161,39 @@ module Op = struct
     range_kind : [`Half_open | `Closed];
   }
 
+  and closure = {
+    clos_parent : closure option;
+    clos_type : Type.t;
+    clos_scope : [`Named of string | `Anon | `Main | `Init];
+    clos_params : Id.t list;
+    clos_block : t list;
+  }
+
 end
 
 module Closure = struct
 
-  type t = {
-    parent : t option;
-    ty : Type.t;
-    var : Id.t;
-    name : string;
-    params : Id.t list;
-    block : Op.t list;
-  }
+  type t = Op.closure
 
-  let create ~parent ~ty ~var ~name ~params ~block =
-    { parent; ty; var; name; params; block }
+  let create ?parent ty ~scope ~params ~block =
+    { Op.clos_parent = parent;
+      clos_type = ty;
+      clos_scope = scope;
+      clos_params = params;
+      clos_block = block }
 
   let of_fundef (def:Op.fundef) =
     create
-      ~parent:None
-      ~ty:def.fdef_ty
-      ~var:def.fdef_var
-      ~name:def.fdef_name
+      def.fdef_ty
+      ~scope:(`Named def.fdef_name)
       ~params:def.fdef_params
       ~block: def.fdef_block
+
+  let string_of_scope = function
+    | `Main -> "main"
+    | `Init -> "init"
+    | `Named name -> Printf.sprintf "\"%s\"" name
+    | `Anon -> "fun"
 
 end
 
@@ -328,7 +337,6 @@ module Compiler = struct
       let _, block = compile_fold fun_ctx def.fdef_block in
       let ctx' = add_var ctx fun_var in
       ctx', Fundef {
-        fdef_var = fun_var;
         fdef_ty = def.fdef_type;
         fdef_name = def.fdef_name.desc;
         fdef_params = params;
@@ -487,6 +495,24 @@ module Compiler = struct
                    range_end = end_op;
                    range_kind = range.range_kind }
 
+    | `Fun fn ->
+      Printf.printf "HIR: compile anon fun\n";
+      Ast.print node;
+      let body = fn.fun_body in
+      let fun_ctx = ctx in
+
+      (* parameters *)
+      let fun_ctx, params = compile_params fun_ctx
+          ~fun_type:body.fbody_type
+          ~params:body.fbody_params in
+      Printf.printf"HIR: anon fun params = %d\n" (List.length params);
+
+      let _, block = compile_fold fun_ctx body.fbody_block in
+      ctx, Fun (Closure.create body.fbody_type
+                  ~scope:`Anon
+                  ~params
+                  ~block)
+
     | `Bool value -> ctx, Bool value.desc
     | `Int value -> ctx, Int value.desc
     | `String value -> ctx, String value.desc
@@ -509,6 +535,17 @@ module Compiler = struct
 
   and compile_iter ctx es =
     List.iter es ~f:(fun e -> ignore @@ compile_node ctx e)
+
+  and compile_params ctx ~fun_type ~params =
+    let open Context in
+    let param_tys = Type.fun_params fun_type in
+    let ctx, rev_vars = List.fold2_exn params param_tys
+        ~init:(ctx, [])
+        ~f:(fun (ctx, vars) name ty ->
+            let ctx, var = new_var ctx ty ~name:name.desc in
+            ctx, var :: vars)
+    in
+    ctx, List.rev rev_vars
 
   and compile_ptn ctx (ptn:Ast.pattern) : Context.t * Op.pattern =
     let open Op in

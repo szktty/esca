@@ -53,7 +53,6 @@ module Op = struct
     | Package of string
     | Import of string
     | Struct of (string * Type.t) list
-    | Fundef of fundef
     | Vardef of (Register.t * Type.t)
     | Defer of t
 
@@ -97,6 +96,7 @@ module Op = struct
     | Float of float
     | String of Register.t * string
     | Range of range
+    | Fun of closure
 
   and context = {
     ctx_src : string;
@@ -113,15 +113,6 @@ module Op = struct
   and branch = {
     br_cond : bool;
     br_dest : label;
-  }
-
-  and fundef = {
-    fdef_ctx : context;
-    fdef_name : string;
-    fdef_ty : Raw_type.t;
-    fdef_params : Register.t list;
-    fdef_locals : Register.t list;
-    fdef_body : t list;
   }
 
   and ref_ = {
@@ -183,10 +174,35 @@ module Op = struct
     range_kind : [`Half_open | `Closed];
   }
 
-  let special_fun = function
-    | "main" -> `Main
-    | "init" -> `Init
-    | name -> `Fun name
+  and closure = {
+    clos_ctx : context;
+    clos_type : Raw_type.t;
+    clos_scope : [`Named of string | `Anon | `Main | `Init];
+    clos_params : Register.t list;
+    clos_locals : Register.t list;
+    clos_body : t list;
+  }
+
+end
+
+module Closure = struct
+
+  type t = Op.closure
+
+  let create ctx ~type_ ~scope ~params ~locals ~body : t =
+    { Op.clos_ctx = ctx;
+      clos_type = type_;
+      clos_scope = scope;
+      clos_params = params;
+      clos_locals = locals;
+      clos_body = body;
+    }
+
+  let string_of_scope = function
+    | `Main -> "main"
+    | `Init -> "init"
+    | `Named name -> Printf.sprintf "\"%s\"" name
+    | `Anon -> "fun"
 
 end
 
@@ -203,7 +219,7 @@ module Program = struct
     out : string;
     pkg : string option;
     vars : string list; (* TODO: var type *)
-    funs : Op.fundef list;
+    funs : Op.closure list;
     main : string option;
     polys : poly list;
     used_mods : Module.t list;
@@ -231,7 +247,7 @@ module Program = struct
     write_import buf prog;
     Printf.printf "polys: %d\n" (List.length prog.polys);
     List.iter prog.polys ~f:(write_poly buf);
-    List.iter prog.funs ~f:(write_fun buf);
+    List.iter prog.funs ~f:(write_clos buf);
     write_main buf prog;
     let code = contents buf in
     Printf.printf "golang = %s\n" (contents buf);
@@ -466,14 +482,22 @@ module Program = struct
   and write_ops buf ops =
     List.iter ops ~f:(write_op buf)
 
-  and write_fun buf func =
+  and write_clos buf clos =
     let open Buffer in
-    let spec = Op.special_fun func.fdef_name in
-    add_string buf @@ sprintf "func %s(" func.fdef_name;
+
+    (* function name *)
+    let ret_ty = Raw_type.return_ty_exn clos.clos_type in
+    let name, ret_ty = match clos.clos_scope with
+      | `Main -> "main", Raw_type.Void
+      | `Init -> "init", Raw_type.Void
+      | `Named name -> name, ret_ty
+      | `Anon -> "", ret_ty
+    in
+    add_string buf @@ sprintf "func %s(" name;
 
     (* parameters *)
     let params =
-      List.map func.fdef_params
+      List.map clos.clos_params
         ~f:(fun var ->
             sprintf "%s %s" var.id (Raw_type.to_string var.ty))
       |> String.concat ~sep:", "
@@ -481,18 +505,13 @@ module Program = struct
     add_string buf @@ sprintf "%s) " params;
 
     (* return value type *)
-    let ret_ty = Raw_type.return_ty_exn func.fdef_ty in
-    begin match spec with
-      | `Main | `Init -> ()
-      | `Fun _ -> Raw_type.to_string ret_ty |> add_string buf
-    end;
-    add_string buf " {\n";
+    add_string buf @@ sprintf " %s {\n" (Raw_type.to_string ret_ty);
 
-    (* flag Register.id *)
+    (* define flag variable *)
     decl_var buf flag Raw_type.Bool;
 
     (* declare variables to avoid "goto" error ("jumps over declaration") *)
-    List.iter func.fdef_locals
+    List.iter clos.clos_locals
       ~f:(fun local ->
           match local.scope with
           | `Temp ->
@@ -502,14 +521,15 @@ module Program = struct
     add_string buf "\n";
 
     (* block *)
-    write_ops buf func.fdef_body;
+    write_ops buf clos.clos_body;
 
     (* suppress return type error after last label *)
-    begin match spec with
+    begin match clos.clos_scope with
       | `Main | `Init -> ()
-      | `Fun _ -> add_string buf "panic(\"Unreachable code\")\n"
+      | _ -> add_string buf "panic(\"Unreachable code\")\n"
     end;
 
+    (* end *)
     add_string buf "}\n\n";
 
 end
@@ -593,7 +613,7 @@ module Context = struct
     { ctx with ops = List.rev ctx.ops;
                locals = List.rev ctx.locals }
 
-  let to_clos_ctx ctx : Op.context =
+  let to_op_clos_ctx ctx : Op.context =
     { ctx_src = ctx.src;
       ctx_ops = ctx.ops;
       ctx_locals = List.rev ctx.locals;
@@ -613,12 +633,14 @@ end
 
 module Compiler = struct
 
-  let rec compile_clos ctx (clos:Hir.Closure.t) : Context.t * Op.fundef =
-    Printf.printf "LIR: compile closure '%s'\n" clos.var.name;
+  let rec compile_clos ctx (clos:Hir.Closure.t) : Context.t * Closure.t =
+    Printf.printf "LIR: compile closure '%s'\n"
+      (Hir.Closure.string_of_scope clos.clos_scope);
+
     let open Context in
 
     (* parameters *)
-    let clos_ctx, rev_params = List.fold_left clos.params
+    let clos_ctx, rev_params = List.fold_left clos.clos_params
         ~init:(ctx, [])
         ~f:(fun (ctx, params) var ->
             let ctx, param = new_param ctx
@@ -629,23 +651,25 @@ module Compiler = struct
     in
     let params = List.rev rev_params in
 
-    let clos_ctx = compile_block clos_ctx clos.block in
+    let clos_ctx = compile_block clos_ctx clos.clos_block in
 
     (* return value *)
     let clos_ctx =
-      match Op.special_fun clos.var.name with
-      | `Fun _ -> clos_ctx (*add_op clos_ctx @@ Return clos_ctx.rc*)
+      match clos.clos_scope with
+      | `Anon | `Named _ -> clos_ctx
       | `Main | `Init -> add_op clos_ctx @@ Nothing_return
     in
 
+    (* finish *)
     let clos_ctx = finish clos_ctx in
-    let fdef = { Op.fdef_ctx = to_clos_ctx clos_ctx;
-                 fdef_ty = Raw_type.of_type clos.ty;
-                 fdef_name = clos.name;
-                 fdef_params = params;
-                 fdef_locals = Register.locals clos_ctx.locals;
-                 fdef_body = clos_ctx.ops } in
-    { ctx with polys = List.append ctx.polys clos_ctx.polys }, fdef
+    let l_clos = Closure.create
+        (to_op_clos_ctx clos_ctx)
+        ~type_:(Raw_type.of_type clos.clos_type)
+        ~scope:clos.clos_scope
+        ~params:params
+        ~locals:(Register.locals clos_ctx.locals)
+        ~body:clos_ctx.ops in
+    { ctx with polys = List.append ctx.polys clos_ctx.polys }, l_clos
 
   and compile_op (ctx:Context.t) (op:Hir.Op.t) : Context.t =
     let open Context in
