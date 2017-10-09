@@ -5,10 +5,10 @@ type Range struct {
 	End   int
 }
 
-func CreateClosedRange(begin int, end int) Range {
+func ClosedRange(begin int, end int) Range {
 	return Range{begin, end}
 }
 
-func CreateHalfOpenRange(begin int, end int) Range {
+func HalfOpenRange(begin int, end int) Range {
 	return Range{begin, end - 1}
 }

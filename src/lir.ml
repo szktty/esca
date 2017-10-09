@@ -471,8 +471,8 @@ module Program = struct
       with_exp buf range.range_to ~f:(fun _ ->
           let fname =
             match range.range_kind with
-            | `Closed -> "CreateClosedRange"
-            | `Half_open -> "CreateHalfOpenRange"
+            | `Closed -> "ClosedRange"
+            | `Half_open -> "HalfOpenRange"
           in
           add @@ sprintf "%s.%s(%s, %s)"
             Raw_type.kernel_decl
