@@ -2,6 +2,18 @@
 
 Esca is an experimental strongly-typed language which compiles to Go.
 
+## Design Goals
+
+The main goal is type-safe programming which makes the best of features of Go.
+
+- Type Safety: Strongly typing, type inference.
+- Interoperable: Using goroutine, calling libraries in Go.
+- Friendly Syntax: Syntax like Go, simplifies idioms of Go.
+- Enumeration: Defining common types for grouping related values.
+- Pattern Matching: Comparing and destructing values easily.
+- Bitstring: Constructing binaries and matching binary patterns.
+- Generics: Avoiding duplication of definitions.
+
 ## Requirements
 
 - OCaml 4.04.2+
