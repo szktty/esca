@@ -182,9 +182,14 @@ module Closure = struct
       clos_block = block }
 
   let of_fundef (def:Op.fundef) =
+    let scope = match def.fdef_name with
+      | "main" -> `Main
+      | "init" -> `Init
+      | name -> `Named name
+    in
     create
       def.fdef_ty
-      ~scope:(`Named def.fdef_name)
+      ~scope
       ~params:def.fdef_params
       ~block: def.fdef_block
 

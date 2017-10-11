@@ -255,12 +255,15 @@ module Program = struct
     Out_channel.write_all prog.out ~data:code;
     prog.out
 
-  and write_pkg buf prog =
+  and write_pkg buf _prog =
     let open Buffer in
+    add_string buf "package main\n"
+      (*
     Option.iter prog.main ~f:(fun _ ->
         add_string buf "package ";
         add_string buf @@ Option.value prog.pkg ~default:"main";
         add_string buf "\n\n")
+       *)
 
   and write_import buf prog =
     let open Buffer in
@@ -541,7 +544,7 @@ module Program = struct
     end;
 
     (* end *)
-    add_string buf "}\n\n";
+    add_string buf "}\n\n"
 
 end
 
