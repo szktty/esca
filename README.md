@@ -17,6 +17,10 @@ $ opam pin add omake 0.9.8.6-0.rc1
 $ opam pin add esca .
 ```
 
+## License
+
+Apache License, Version 2
+
 ## Specification
 
 ### Top-Level Execution
