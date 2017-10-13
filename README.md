@@ -13,6 +13,7 @@ The main goal is type-safe programming which makes the best of features of Go.
 - Pattern Matching: Comparing and destructing values easily.
 - Bitstring: Constructing binaries and matching binary patterns.
 - Generics: Avoiding duplication of definitions.
+- Tail Recursion Optimization: Supporting efficiency tail recursion functions.
 
 ## Requirements
 
