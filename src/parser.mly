@@ -60,14 +60,10 @@ let create_unexp op_loc op exp =
 %token <Location.t> GT              (* ">" *)
 %token <Location.t> GE              (* ">=" *)
 %token <Location.t> PLUS            (* "+" *)
-%token <Location.t> FPLUS           (* "+." *)
 %token <Location.t> MINUS           (* "-" *)
-%token <Location.t> FMINUS          (* "-." *)
 %token <Location.t> AST             (* "*" *)
-%token <Location.t> FAST            (* "*." *)
 %token <Location.t> AST2            (* "**" *)
 %token <Location.t> SLASH           (* "/" *)
-%token <Location.t> FSLASH          (* "/." *)
 %token <Location.t> PCT             (* "%" *)
 %token <Location.t> POS             (* for positive integer *)
 %token <Location.t> FPOS            (* for positive float *)
@@ -106,8 +102,8 @@ let create_unexp op_loc op exp =
 %left LT GT LE GE
 %left RPIPE LPIPE
 %nonassoc DOT2LT DOT3
-%left PLUS FPLUS MINUS FMINUS
-%left AST FAST SLASH FSLASH PCT
+%left PLUS MINUS
+%left AST SLASH PCT
 %right AST2
 
 %nonassoc trail
@@ -457,14 +453,10 @@ fun_exp:
 
 bin_exp:
   | exp PLUS exp { create_binexp $1 $2 `Add $3 }
-  | exp FPLUS exp { create_binexp $1 $2 `Fadd $3 }
   | exp MINUS exp { create_binexp $1 $2 `Sub $3 }
-  | exp FMINUS exp { create_binexp $1 $2 `Fsub $3 }
   | exp AST exp { create_binexp $1 $2 `Mul $3 }
-  | exp FAST exp { create_binexp $1 $2 `Fmul $3 }
   | exp AST2 exp { create_binexp $1 $2 `Pow $3 }
   | exp SLASH exp { create_binexp $1 $2 `Div $3 }
-  | exp FSLASH exp { create_binexp $1 $2 `Fdiv $3 }
   | exp PCT exp { create_binexp $1 $2 `Mod $3 }
   | exp EQQ exp { create_binexp $1 $2 `Eq $3 }
   | exp NE exp { create_binexp $1 $2 `Ne $3 }
@@ -483,10 +475,8 @@ unary_exp:
 unary_body:
   | PLUS simple_exp { create_unexp $1 `Pos $2 }
   | POS simple_exp { create_unexp $1 `Pos $2 }
-  | FPOS simple_exp { create_unexp $1 `Fpos $2 }
   | MINUS simple_exp { create_unexp $1 `Neg $2 }
   | NEG simple_exp { create_unexp $1 `Neg $2 }
-  | FNEG simple_exp { create_unexp $1 `Fneg $2 }
 
 simple_exp:
   | var %prec app { $1 }

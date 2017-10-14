@@ -4,9 +4,7 @@ type op = op_desc Located.t
 
 and op_desc = [
   | `Pos              (* "+" + integer *)
-  | `Fpos             (* "+." + float *)
   | `Neg              (* "-" + integer *)
-  | `Fneg             (* "-." + float *)
   | `Eq               (* "==" *)
   | `Ne               (* "!=" *)
   | `Lt               (* "<" *)
@@ -16,13 +14,9 @@ and op_desc = [
   | `List_add         (* "++" *)
   | `List_diff        (* "--" *)
   | `Add              (* "+" *)
-  | `Fadd             (* "+." *)
   | `Sub              (* "-" *)
-  | `Fsub             (* "-." *)
   | `Mul              (* "*" *)
-  | `Fmul             (* "*." *)
   | `Div              (* "/" *)
-  | `Fdiv             (* "/." *)
   | `Pow              (* "**" *)
   | `Mod              (* "%" *)
   | `And              (* "and" *)

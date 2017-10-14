@@ -445,7 +445,6 @@ let rec infer (e:Ast.t)
       | `Unexp exp ->
         let op_ty, val_ty = match exp.unexp_op.desc with
           | `Pos | `Neg -> (Type.int, Type.int)
-          | `Fpos | `Fneg -> (Type.float, Type.float)
           | _ -> failwith "not yet supported"
         in
         unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e);
@@ -462,8 +461,6 @@ let rec infer (e:Ast.t)
           | `Add | `Sub | `Mul | `Div
           | `Pow | `Mod | `Lcomp | `Rcomp ->
             (Type.int, Type.int)
-          | `Fadd | `Fsub | `Fmul | `Fdiv ->
-            (Type.float, Type.float)
           | _ -> failwith "not yet supported"
         in
         unify ~ex:op_ty ~ac:(easy_infer ~clos ~env e1);

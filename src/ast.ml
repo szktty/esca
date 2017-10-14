@@ -5,9 +5,7 @@ include Ast_intf
 let op_to_string op =
   match Located.(op.desc) with
   | `Pos -> "|+|"
-  | `Fpos -> "|+.|"
   | `Neg -> "|-|"
-  | `Fneg -> "|-.|"
   | `Eq -> "=="
   | `Ne -> "!="
   | `Lt -> "<"
@@ -15,13 +13,9 @@ let op_to_string op =
   | `Gt -> ">"
   | `Ge -> ">="
   | `Add -> "+"
-  | `Fadd -> "+."
   | `Sub -> "-"
-  | `Fsub -> "-."
   | `Mul -> "*"
-  | `Fmul -> "*."
   | `Div -> "/"
-  | `Fdiv -> "/."
   | `Pow -> "**"
   | `Mod -> "%"
   | _ -> failwith "not supported operator"
