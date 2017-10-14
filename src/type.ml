@@ -2,35 +2,33 @@ open Core.Std
 
 type t = desc Located.t
 
-and desc = [
-  | `App of tycon * t list
-  | `Var of tyvar
-  | `Poly of [ `Preunify of tyvar list * t | `Unify of t ] ref
-  | `Prim of primitive
-  | `Unique of t * Valuepath.t
-  | `Meta of metavar
-]
+and desc =
+  | App of tycon * t list
+  | Var of tyvar
+  | Poly of [ `Preunify of tyvar list * t | `Unify of t ] ref
+  | Prim of primitive
+  | Unique of t * Valuepath.t
+  | Meta of metavar
 
-and tycon = [
-  | `Void
-  | `Bool
-  | `Int
-  | `Float
-  | `String
-  | `List
-  | `Tuple
-  | `Range
-  | `Option
-  | `Box
-  | `Struct of string list
-  | `Enum of string list
-  | `Fun
-  | `Fun_printf
-  | `Method of t
-  | `Module of string
-  | `Stream
-  | `Tyfun of tyvar list * t
-]
+and tycon =
+  | Tycon_void
+  | Tycon_bool
+  | Tycon_int
+  | Tycon_float
+  | Tycon_string
+  | Tycon_list
+  | Tycon_tuple
+  | Tycon_range
+  | Tycon_option
+  | Tycon_box
+  | Tycon_struct of string list
+  | Tycon_enum of string list
+  | Tycon_fun
+  | Tycon_printf
+  | Tycon_method of t
+  | Tycon_module of string
+  | Tycon_stream
+  | Tycon_tyfun of tyvar list * t
 
 and tyvar = string
 
@@ -46,7 +44,7 @@ let create loc desc =
   Located.create loc desc
 
 let metavar loc =
-  Located.create loc (`Meta (ref None))
+  Located.create loc (Meta (ref None))
 
 let metavar_some loc =
   metavar (Some loc)
@@ -61,106 +59,106 @@ let equal (ty1:t) (ty2:t) =
 
 let rec to_string (ty:t) =
   match ty.desc with
-  | `App (tycon, args) ->
+  | App (tycon, args) ->
     let tycon_s = tycon_to_string tycon in
     let args_s =
       List.map args ~f:to_string
       |> String.concat ~sep:", "
     in
     Printf.sprintf "App(%s, [%s])" tycon_s args_s
-  | `Meta { contents = None } -> "Meta(?)"
-  | `Meta { contents = Some ty } -> "Meta(" ^ to_string ty ^ ")"
-  | `Var name -> "Var(" ^ name ^ ")"
-  | `Poly { contents = `Preunify (tyvars, ty) } ->
+  | Meta { contents = None } -> "Meta(?)"
+  | Meta { contents = Some ty } -> "Meta(" ^ to_string ty ^ ")"
+  | Var name -> "Var(" ^ name ^ ")"
+  | Poly { contents = `Preunify (tyvars, ty) } ->
     Printf.sprintf "Poly([%s], %s)"
       (String.concat tyvars ~sep:", ") (to_string ty)
-  | `Poly { contents = `Unify ty } ->
+  | Poly { contents = `Unify ty } ->
     Printf.sprintf "Poly(%s)" (to_string ty)
-  | `Prim prim ->
+  | Prim prim ->
     Printf.sprintf "Prim(\"%s.%s\", %s)"
       prim.prim_pkg prim.prim_id (to_string prim.prim_type)
-  | `Unique (ty, path) ->
+  | Unique (ty, path) ->
     Printf.sprintf "Unique(%s, \"%s\")"
       (to_string ty) (Namepath.to_string path) 
 
 and tycon_to_string = function
-  | `Void -> "Void"
-  | `Bool -> "Bool"
-  | `Int -> "Int"
-  | `Float -> "Float"
-  | `String -> "String"
-  | `List -> "List"
-  | `Tuple -> "Tuple"
-  | `Range -> "Range"
-  | `Fun -> "Fun"
-  | `Fun_printf -> "Fun_printf"
-  | `Method ty -> Printf.sprintf "Method(%s)" (to_string ty)
-  | `Stream -> "Stream"
-  | `Option -> "Option"
-  | `Box -> "Box"
-  | `Module name -> Printf.sprintf "Module(%s)" name
+  | Tycon_void -> "Void"
+  | Tycon_bool -> "Bool"
+  | Tycon_int -> "Int"
+  | Tycon_float -> "Float"
+  | Tycon_string -> "String"
+  | Tycon_list -> "List"
+  | Tycon_tuple -> "Tuple"
+  | Tycon_range -> "Range"
+  | Tycon_fun -> "Fun"
+  | Tycon_printf -> "Fun_printf"
+  | Tycon_method ty -> Printf.sprintf "Method(%s)" (to_string ty)
+  | Tycon_stream -> "Stream"
+  | Tycon_option -> "Option"
+  | Tycon_box -> "Box"
+  | Tycon_module name -> Printf.sprintf "Module(%s)" name
   | _ -> failwith "not impl"
 
 let rec unwrap (ty:t) =
   match ty.desc with
-  | `Meta { contents = Some ty }
-  | `Poly { contents = `Preunify (_, ty) }  -> unwrap ty
-  | `Poly { contents = `Unify ty } -> unwrap ty
-  | `Prim { prim_type } -> unwrap prim_type
+  | Meta { contents = Some ty }
+  | Poly { contents = `Preunify (_, ty) }  -> unwrap ty
+  | Poly { contents = `Unify ty } -> unwrap ty
+  | Prim { prim_type } -> unwrap prim_type
   | _ -> ty
 
 let rec fun_params (ty:t) =
   match (unwrap ty).desc with
-  | `App (`Fun, args) -> List.rev args |> List.tl_exn |> List.rev
-  | `Prim { prim_type } -> fun_params prim_type
+  | App (Tycon_fun, args) -> List.rev args |> List.tl_exn |> List.rev
+  | Prim { prim_type } -> fun_params prim_type
   | _ -> failwith "not function"
 
 let rec fun_return (ty:t) =
   match ty.desc with
-  | `Meta { contents = Some ty }
-  | `Poly { contents = `Preunify (_, ty) } -> fun_return ty
-  | `Poly { contents = `Unify ty } -> fun_return ty
-  | `App (`Fun, args) 
-  | `App (`Method _, args) -> List.last_exn args
-  | `Prim { prim_type } -> fun_return prim_type
+  | Meta { contents = Some ty }
+  | Poly { contents = `Preunify (_, ty) } -> fun_return ty
+  | Poly { contents = `Unify ty } -> fun_return ty
+  | App (Tycon_fun, args)
+  | App (Tycon_method _, args) -> List.last_exn args
+  | Prim { prim_type } -> fun_return prim_type
   | _ -> failwith @@ Printf.sprintf "not function %s" (to_string ty)
 
 let module_name (ty:t) =
   match (unwrap ty).desc with
-  | `App (`Module name, _) -> Some name
+  | App (Tycon_module name, _) -> Some name
   | _ -> None
 
 let prim_id (ty:t) =
   match (unwrap ty).desc with
-  | `Prim { prim_id } -> Some prim_id
+  | Prim { prim_id } -> Some prim_id
   | _ -> None
 
 let prim_id_exn ty =
   Option.value_exn (prim_id ty)
 
-let tyvar name = Located.less @@ `Var name
+let tyvar name = Located.less @@ Var name
 let tyvar_a = tyvar "a"
 let tyvar_b = tyvar "b"
 let tyvar_c = tyvar "c"
 let tyvar_d = tyvar "d"
 
-let poly tyvars (ty:t) : desc = `Poly (ref (`Preunify (tyvars, ty)))
+let poly tyvars (ty:t) : desc = Poly (ref (`Preunify (tyvars, ty)))
 
-let app ?(args=[]) tycon = `App (tycon, args)
-let desc_void = app `Void
-let desc_bool = app `Bool
-let desc_int = app `Int
-let desc_float = app `Float
-let desc_string = app `String
-let desc_range = app `Range
-let desc_list e = app ~args:[e] `List
-let desc_tuple es = app ~args:es `Tuple
-let desc_option e = app ~args:[e] `Option
-let desc_box e = app ~args:[e] `Box
+let app ?(args=[]) tycon = App (tycon, args)
+let desc_void = app Tycon_void
+let desc_bool = app Tycon_bool
+let desc_int = app Tycon_int
+let desc_float = app Tycon_float
+let desc_string = app Tycon_string
+let desc_range = app Tycon_range
+let desc_list e = app ~args:[e] Tycon_list
+let desc_tuple es = app ~args:es Tycon_tuple
+let desc_option e = app ~args:[e] Tycon_option
+let desc_box e = app ~args:[e] Tycon_box
 let desc_fun params ret =
-  app ~args:(List.append params [ret]) `Fun
-let desc_fun_printf = app `Fun_printf
-let desc_stream = app `Stream
+  app ~args:(List.append params [ret]) Tycon_fun
+let desc_fun_printf = app Tycon_printf
+let desc_stream = app Tycon_stream
 
 let void = Located.less desc_void
 let bool = Located.less desc_bool
@@ -181,32 +179,32 @@ let fun_printf = Located.less @@ desc_fun_printf
 let fun_to_method (f:t) : t = 
   let rec to_method (ty:t) =
     match ty.desc with
-    | `Meta { contents = Some ty } -> to_method ty
-    | `App (`Fun, recv :: args) -> `App (`Method recv, args)
-    | `Poly { contents = `Preunify (tyvars, ty) } ->
-      `Poly (ref (`Preunify (tyvars, (Located.create ty.loc (to_method ty)))))
-    | `Poly { contents = `Unify ty } -> to_method ty
+    | Meta { contents = Some ty } -> to_method ty
+    | App (Tycon_fun, recv :: args) -> App (Tycon_method recv, args)
+    | Poly { contents = `Preunify (tyvars, ty) } ->
+      Poly (ref (`Preunify (tyvars, (Located.create ty.loc (to_method ty)))))
+    | Poly { contents = `Unify ty } -> to_method ty
     | _ -> failwith "not supported"
   in
   Located.create f.loc (to_method f)
 
 let prim pkg name ty =
-  Located.less @@ `Prim { prim_pkg = pkg;
-                          prim_id = name;
-                          prim_type = ty }
+  Located.less @@ Prim { prim_pkg = pkg;
+                         prim_id = name;
+                         prim_type = ty }
 
-let module_ name = Located.less @@ app (`Module name)
+let module_ name = Located.less @@ app (Tycon_module name)
 let stream = Located.less @@ desc_stream 
 
 let unique ty ~path =
-  Located.less @@ `Unique (ty, path)
+  Located.less @@ Unique (ty, path)
 
 let struct_ fields =
   let names, tys = List.fold_left fields ~init:([], [])
       ~f:(fun (names, tys) (name, ty) ->
           name :: names, ty :: tys)
   in
-  unique @@ `App (`Struct (List.rev names), List.rev tys)
+  App (Tycon_struct (List.rev names), List.rev tys)
 
 let parse_format s =
   let module F = Utils.Format in
@@ -232,7 +230,7 @@ module Spec = struct
     | `Option of t
     | `Box of t
     | `Fun of t list
-    | `Fun_printf
+    | `Printf
     | `Stream
   ]
 
@@ -246,7 +244,7 @@ module Spec = struct
   let range = `Range
   let option e = `Option e
   let box e = `Box e
-  let fun_printf = `Fun_printf
+  let printf = `Printf
   let stream = `Stream
 
   let a = `Tyvar "a"
@@ -281,8 +279,8 @@ module Spec = struct
       | `Float -> tyvars, desc_float
       | `String -> tyvars, desc_string
       | `Stream -> tyvars, desc_stream
-      | `Fun_printf -> tyvars, desc_fun_printf
-      | `Tyvar name -> (name :: tyvars), `Var name
+      | `Printf -> tyvars, desc_fun_printf
+      | `Tyvar name -> (name :: tyvars), Var name
       | `List e ->
         let tyvars', ty = f tyvars e in
         tyvars', desc_list (Located.less ty)
@@ -293,7 +291,7 @@ module Spec = struct
                 let tyvars', arg' = f tyvars arg in
                 tyvars', Located.less arg' :: args)
         in
-        tyvars', `App (`Fun, List.rev args')
+        tyvars', App (Tycon_fun, List.rev args')
       | _ -> failwith "not yet support"
     in
     f [] spec

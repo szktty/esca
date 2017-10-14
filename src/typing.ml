@@ -74,14 +74,14 @@ let rec generalize (ty:Type.t) : Type.t =
 
   let rec walk ty : t =
     let gen = match ty.desc with
-      | `App (tycon, args) ->
+      | App (tycon, args) ->
         let gen_tycon = match tycon with
-          | `Tyfun (tyvars, ty) -> `Tyfun (tyvars, generalize ty)
+          | Tycon_tyfun (tyvars, ty) -> Tycon_tyfun (tyvars, generalize ty)
           | tycon -> tycon
         in
-        `App (gen_tycon, List.map args ~f:walk)
-      | `Var tyvar -> `Var tyvar
-      | `Meta ({ contents = None } as ref) ->
+        App (gen_tycon, List.map args ~f:walk)
+      | Var tyvar -> Var tyvar
+      | Meta ({ contents = None } as ref) ->
         let tyvar = match List.Assoc.find !tyvars ref ~equal:phys_equal with
           | Some tyvar -> tyvar
           | None ->
@@ -89,15 +89,15 @@ let rec generalize (ty:Type.t) : Type.t =
             tyvars := (ref, tyvar) :: !tyvars;
             tyvar
         in
-        `Var tyvar
-      | `Meta ({ contents = Some ty }) -> (walk ty).desc
-      | `Poly ({ contents = `Preunify (tyvars, ty) } as ref) ->
+        Var tyvar
+      | Meta ({ contents = Some ty }) -> (walk ty).desc
+      | Poly ({ contents = `Preunify (tyvars, ty) } as ref) ->
         ref := `Preunify (tyvars, walk ty);
-        `Poly ref
-      | `Poly _ -> ty.desc
-      | `Prim prim ->
-        `Prim { prim with prim_type = walk prim.prim_type }
-      | `Unique (ty, path) -> `Unique (walk ty, path)
+        Poly ref
+      | Poly _ -> ty.desc
+      | Prim prim ->
+        Prim { prim with prim_type = walk prim.prim_type }
+      | Unique (ty, path) -> Unique (walk ty, path)
     in
     Located.create ty.loc gen
   in
@@ -112,50 +112,50 @@ let rec generalize (ty:Type.t) : Type.t =
 
 let rec subst (ty:Type.t) (env:(tyvar * t) list) =
   match ty.desc with
-  | `Var tyvar ->
+  | Var tyvar ->
     Option.value (List.Assoc.find env ~equal:(=) tyvar) ~default:ty
 
-  | `App (`Tyfun (tyvars, ty'), args) ->
+  | App (Tycon_tyfun (tyvars, ty'), args) ->
     let env' = List.map2_exn tyvars args
         ~f:(fun tyvar ty -> (tyvar, ty)) in
     subst (subst ty' env') env
 
-  | `App (tycon, args) ->
+  | App (tycon, args) ->
     let args' = List.map args
         ~f:(fun ty' -> subst ty' env) in
-    Located.create ty.loc @@ `App (tycon, args')
+    Located.create ty.loc @@ App (tycon, args')
 
-  | `Poly ({ contents = `Preunify (tyvars, ty') } as ref) ->
+  | Poly ({ contents = `Preunify (tyvars, ty') } as ref) ->
     let tyvars' = List.mapi tyvars
         ~f:(fun i _tyvar ->
             Array.get Type.var_names (i + List.length env))
     in
     let ty'' = subst ty' @@ List.map2_exn tyvars tyvars'
         ~f:(fun tyvar tyvar' ->
-            (tyvar, Located.create ty.loc @@ `Var tyvar'))
+            (tyvar, Located.create ty.loc @@ Var tyvar'))
     in
     ref := `Unify (subst ty'' env);
     ty
 
-  | `Poly _ -> ty
+  | Poly _ -> ty
 
-  | `Prim prim ->
+  | Prim prim ->
     Located.create ty.loc @@
-    `Prim { prim with prim_type = subst prim.prim_type env }
+    Prim { prim with prim_type = subst prim.prim_type env }
 
-  | `Unique (ty, path) ->
-    Located.create ty.loc @@ `Unique (subst ty env, path)
+  | Unique (ty, path) ->
+    Located.create ty.loc @@ Unique (subst ty env, path)
 
-  | `Meta { contents = Some ty' } ->
+  | Meta { contents = Some ty' } ->
     Option.value_map (List.find env ~f:(fun (_, ty) -> ty = ty'))
       ~f:(fun (_, ty') -> subst ty' env)
       ~default:ty
 
-  | `Meta { contents = None } -> ty
+  | Meta { contents = None } -> ty
 
 let instantiate (ty:Type.t) =
   match ty.desc with
-  | `Poly ({ contents = `Preunify (tyvars, ty') } as ref) ->
+  | Poly ({ contents = `Preunify (tyvars, ty') } as ref) ->
     let env = List.map tyvars
         ~f:(fun tyvar ->
             (tyvar, metavar ty.loc)) in
@@ -165,81 +165,82 @@ let instantiate (ty:Type.t) =
 
 let rec occur (ref:t option ref) (ty:Type.t) : bool =
   match ty.desc with
-  | `App (tycon, args) ->
+  | App (tycon, args) ->
     begin match tycon with
-      | `Void
-      | `Bool
-      | `Int
-      | `Float
-      | `String
-      | `Range
-      | `Stream ->
+      | Tycon_void
+      | Tycon_bool
+      | Tycon_int
+      | Tycon_float
+      | Tycon_string
+      | Tycon_range
+      | Tycon_stream ->
         false
-      | `List
-      | `Tuple
-      | `Option
-      | `Box
-      | `Fun ->
+      | Tycon_list
+      | Tycon_tuple
+      | Tycon_option
+      | Tycon_box
+      | Tycon_fun ->
         List.exists args ~f:(occur ref)
-      | `Method recv ->
+      | Tycon_method recv ->
         List.exists (recv :: args) ~f:(occur ref)
-      | `Tyfun (_, ty) ->
+      | Tycon_tyfun (_, ty) ->
         occur ref ty
       | _ -> failwith "not impl"
     end
-  | `Prim { prim_type } -> occur ref prim_type
-  | `Meta ref2 when phys_equal ref ref2 -> true
-  | `Meta { contents = None } -> false
-  | `Meta { contents = Some t2 } -> occur ref t2
+  | Prim { prim_type } -> occur ref prim_type
+  | Meta ref2 when phys_equal ref ref2 -> true
+  | Meta { contents = None } -> false
+  | Meta { contents = Some t2 } -> occur ref t2
   | _ -> failwith "not impl"
 
 let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   Printf.printf "unify %s and %s\n" (Type.to_string ex) (Type.to_string ac);
   match ex.desc, ac.desc with
-  | `App (`Void, []), `App (`Void, [])
-  | `App (`Bool, []), `App (`Bool, [])
-  | `App (`Int, []), `App (`Int, [])
-  | `App (`Float, []), `App (`Float, [])
-  | `App (`String, []), `App (`String, [])
-  | `App (`Range, []), `App (`Range, []) -> ()
+  | App (Tycon_void, []), App (Tycon_void, [])
+  | App (Tycon_bool, []), App (Tycon_bool, [])
+  | App (Tycon_int, []), App (Tycon_int, [])
+  | App (Tycon_float, []), App (Tycon_float, [])
+  | App (Tycon_string, []), App (Tycon_string, [])
+  | App (Tycon_range, []), App (Tycon_range, []) -> ()
 
-  | `App (`List, [ex]), `App (`List, [ac])
-  | `App (`Option, [ex]), `App (`Option, [ac])
-  | `App (`Box, [ex]), `App (`Box, [ac]) -> unify ~ex ~ac
+  | App (Tycon_list, [ex]), App (Tycon_list, [ac])
+  | App (Tycon_option, [ex]), App (Tycon_option, [ac])
+  | App (Tycon_box, [ex]), App (Tycon_box, [ac]) -> unify ~ex ~ac
 
-  | `App (`Tuple, exs), `App (`Tuple, acs)
-  | `App (`Fun, exs), `App (`Fun, acs)
+  | App (Tycon_tuple, exs), App (Tycon_tuple, acs)
+  | App (Tycon_fun, exs), App (Tycon_fun, acs)
     when List.length exs = List.length acs ->
     List.iter2_exn exs acs ~f:(fun ex ac -> unify ~ex ~ac)
 
-  | `App (`Fun_printf, []), `App (`Fun_printf, [])
-  | `App (`Fun_printf, []), `App (`Fun, _) -> ()
+  (* TODO *)
+  | App (Tycon_printf, []), App (Tycon_printf, [])
+  | App (Tycon_printf, []), App (Tycon_fun, _) -> ()
 
-  | `App (`Method _, exs), `App (`Method _, acs)
-  | `App (`Fun, exs), `App (`Method _, acs)
-  | `App (`Method _, exs), `App (`Fun, acs)
+  | App (Tycon_method _, exs), App (Tycon_method _, acs)
+  | App (Tycon_fun, exs), App (Tycon_method _, acs)
+  | App (Tycon_method _, exs), App (Tycon_fun, acs)
     when List.length exs = List.length acs ->
     List.iter2_exn exs acs ~f:(fun ex ac -> unify ~ex ~ac)
 
-  | `Poly { contents = `Preunify _ }, _ -> unify ~ex:(instantiate ex) ~ac;
-  | _, `Poly { contents = `Preunify _ } -> unify ~ex ~ac:(instantiate ac)
-  | `Poly { contents = `Unify ex }, _ -> unify ~ex ~ac
-  | _, `Poly { contents = `Unify ac } -> unify ~ex ~ac
+  | Poly { contents = `Preunify _ }, _ -> unify ~ex:(instantiate ex) ~ac;
+  | _, Poly { contents = `Preunify _ } -> unify ~ex ~ac:(instantiate ac)
+  | Poly { contents = `Unify ex }, _ -> unify ~ex ~ac
+  | _, Poly { contents = `Unify ac } -> unify ~ex ~ac
 
-  | `Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
-  | _, `Prim { prim_type } -> unify ~ex ~ac:prim_type
+  | Prim { prim_type }, _ -> unify ~ex:prim_type ~ac
+  | _, Prim { prim_type } -> unify ~ex ~ac:prim_type
 
-  | `Meta ex, `Meta ac when phys_equal ex ac -> ()
-  | `Meta { contents = Some ex }, _ -> unify ~ex ~ac
-  | _, `Meta { contents = Some ac } -> unify ~ex ~ac
+  | Meta ex, Meta ac when phys_equal ex ac -> ()
+  | Meta { contents = Some ex }, _ -> unify ~ex ~ac
+  | _, Meta { contents = Some ac } -> unify ~ex ~ac
 
-  | `Meta ({ contents = None } as ref), _ ->
+  | Meta ({ contents = None } as ref), _ ->
     if occur ref ac then
       fail_unify ex ac
     else
       ref := Some ac
 
-  | _, `Meta ({ contents = None } as ref) ->
+  | _, Meta ({ contents = None } as ref) ->
     if occur ref ex then
       fail_unify ex ac
     else
@@ -415,7 +416,7 @@ let rec infer (e:Ast.t)
           | Some prefix ->
             let ty = easy_infer ~clos ~env prefix in
             begin match (Type.unwrap ty).desc with
-              | `App (`Module mname, _) ->
+              | App (Tycon_module mname, _) ->
                 begin match Library.find_module mname with
                   | None -> failwith (sprintf "unknown module %s" mname)
                   | Some m ->

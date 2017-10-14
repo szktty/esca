@@ -23,19 +23,19 @@ type t =
 
 let rec of_type (ty:Type.t) : t =
   match (Type.unwrap ty).desc with
-  | `Meta { contents = var } ->
+  | Meta { contents = var } ->
     begin match var with
       | None -> failwith "must not be none"
       | Some ty -> of_type ty
     end
-  | `App (`Void, []) -> Void
-  | `App (`Bool, []) -> Bool
-  | `App (`Int, []) -> Int
-  | `App (`Float, []) -> Float32
-  | `App (`String, []) -> String
-  | `App (`Range, []) -> Range
-  | `App (`Fun, args)
-  | `App (`Method _, args) ->
+  | App (Tycon_void, []) -> Void
+  | App (Tycon_bool, []) -> Bool
+  | App (Tycon_int, []) -> Int
+  | App (Tycon_float, []) -> Float32
+  | App (Tycon_string, []) -> String
+  | App (Tycon_range, []) -> Range
+  | App (Tycon_fun, args)
+  | App (Tycon_method _, args) ->
     let rec collect args accu =
       match args with
       | [] -> failwith "error"
@@ -44,7 +44,7 @@ let rec of_type (ty:Type.t) : t =
         collect args (of_type arg :: accu)
     in
     collect args []
-  | `Prim { prim_type } -> of_type prim_type
+  | Prim { prim_type } -> of_type prim_type
   | _ -> Printf.printf "type = %s\n" (Type.to_string ty);
     failwith "of_type: not supported"
 

@@ -460,7 +460,7 @@ module Compiler = struct
       let desc = Option.value_exn var.var_value in
       begin match desc with
         | { scope = `Module path;
-            type_ = { desc = `Poly { contents = `Unify ty } };
+            type_ = { desc = Poly { contents = `Unify ty } };
             name } ->
           (* TODO: namepath *)
           let m = Option.value_exn (Library.find_module path.name) in

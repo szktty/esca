@@ -16,7 +16,7 @@ let init () =
                 +> fun_ "id" Type.Spec.(a @-> a)
                 +> fun_ "show" Type.Spec.(a @-> void)
                 +> fun_ "print" Type.Spec.(string @-> void)
-                +> fun_ "printf" Type.Spec.fun_printf
+                +> fun_ "printf" Type.Spec.printf
                 +> string "version"
                 |> end_);
 
