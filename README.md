@@ -70,8 +70,19 @@ func add(x: Int, y: Int) {
 }
 ```
 
-#### Anonymous Functions
+#### Function Definition (Tail recursion optimization)
 
+```
+tailrec func findFixPoint(x: Double) -> Double {
+    if x == math.cos(x) {
+        return x
+    } else {
+        return findFixPoint(math.cos(x))
+    }
+}
+```
+
+#### Anonymous Functions
 
 ```
 // no arguments
@@ -164,6 +175,12 @@ if err != nil {
 
 ### Literals
 
+#### Void
+
+```
+()
+```
+
 #### Boolean
 
 ```
@@ -179,4 +196,37 @@ false
 
 ```
 "Hello, world!"
+```
+
+#### Reference (Pointer)
+
+```
+&i
+```
+
+#### List
+
+```
+[] // empty
+[1, 2, 3]
+```
+
+#### Tuple
+
+```
+(1, 2, 3)
+```
+
+#### Map
+
+```
+[:] // empty
+["a": 1, "b": 2, "c": 3]
+```
+
+#### Range
+
+```
+1...10 // 1-10
+1..<10 // 1-9
 ```
