@@ -69,6 +69,7 @@ type t = [
   | `List of t list
   | `Tuple of t list
   | `Range of range
+  | `Ref of t * Type.t
   | `Struct of t struct_
   | `Enum of (text, t) enum
   | `Fun of func

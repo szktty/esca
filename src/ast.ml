@@ -214,6 +214,10 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
         | `Closed -> "...");
     write range.range_end;
     add_rp ()
+  | `Ref (exp, _) ->
+    add_string "(ref ";
+    write exp;
+    add_rp ()
   | `Struct str ->
     add_string "{";
     Namepath.iter str.str_namepath ~f:(fun name ->

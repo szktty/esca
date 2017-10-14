@@ -20,6 +20,7 @@ type t =
   | Option of t
   | Range
   | Fun of t list * t
+  | Ptr of t
 
 let rec of_type (ty:Type.t) : t =
   match (Type.unwrap ty).desc with
@@ -34,6 +35,7 @@ let rec of_type (ty:Type.t) : t =
   | App (Tycon_float, []) -> Float32
   | App (Tycon_string, []) -> String
   | App (Tycon_range, []) -> Range
+  | App (Tycon_ref, [arg]) -> Ptr (of_type arg)
   | App (Tycon_fun, args)
   | App (Tycon_method _, args) ->
     let rec collect args accu =
@@ -68,6 +70,7 @@ let rec to_decl = function
   | Float64 -> "float64"
   | String -> "string"
   | Range -> range_decl
+  | Ptr ty -> Printf.sprintf "&%s" (to_decl ty)
   | Fun (args, ret) ->
     let open Buffer in
     let buf = create 16 in

@@ -325,6 +325,10 @@ let rec infer (e:Ast.t)
         unify ~ex:Type.int ~ac:(easy_infer range.range_end ~clos ~env);
         (env, desc_range)
 
+      | `Ref (e, ty) ->
+        unify ~ex:ty ~ac:(Type.ref (easy_infer e ~clos ~env));
+        (env, ty.desc)
+
       | `Vardef vdef ->
         let exp_ty = easy_infer ~clos ~env vdef.vdef_exp in
         let env, ptn_ty = infer_ptn ~clos ~env vdef.vdef_ptn in

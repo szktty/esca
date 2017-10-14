@@ -103,7 +103,7 @@ let create_unexp op_loc op exp =
 %left RPIPE LPIPE
 %nonassoc DOT2LT DOT3
 %left PLUS MINUS
-%left AST SLASH PCT
+%left AST SLASH PCT AMP
 %right AST2
 
 %nonassoc trail
@@ -471,6 +471,7 @@ bin_exp:
 
 unary_exp:
   | LPAREN unary_body RPAREN { $2 }
+  | AMP simple_exp { `Ref ($2, Type.metavar None) }
 
 unary_body:
   | PLUS simple_exp { create_unexp $1 `Pos $2 }
