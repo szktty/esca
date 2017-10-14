@@ -20,7 +20,7 @@ and tycon =
   | Tycon_tuple
   | Tycon_range
   | Tycon_option
-  | Tycon_box
+  | Tycon_ref
   | Tycon_struct of string list
   | Tycon_enum of string list
   | Tycon_fun
@@ -95,7 +95,7 @@ and tycon_to_string = function
   | Tycon_method ty -> Printf.sprintf "Method(%s)" (to_string ty)
   | Tycon_stream -> "Stream"
   | Tycon_option -> "Option"
-  | Tycon_box -> "Box"
+  | Tycon_ref -> "Ref"
   | Tycon_module name -> Printf.sprintf "Module(%s)" name
   | _ -> failwith "not impl"
 
@@ -154,7 +154,7 @@ let desc_range = app Tycon_range
 let desc_list e = app ~args:[e] Tycon_list
 let desc_tuple es = app ~args:es Tycon_tuple
 let desc_option e = app ~args:[e] Tycon_option
-let desc_box e = app ~args:[e] Tycon_box
+let desc_ref e = app ~args:[e] Tycon_ref
 let desc_fun params ret =
   app ~args:(List.append params [ret]) Tycon_fun
 let desc_fun_printf = app Tycon_printf
@@ -171,8 +171,8 @@ let list_gen = Located.less @@ poly ["a"] (list tyvar_a)
 let tuple es = Located.less @@ desc_tuple es
 let option e = Located.less @@ desc_option e
 let option_gen = Located.less @@ poly ["a"] (option tyvar_a)
-let box e = Located.less @@ desc_box e
-let box_gen = Located.less @@ poly ["a"] (box tyvar_a)
+let ref e = Located.less @@ desc_ref e
+let ref_gen = Located.less @@ poly ["a"] (ref tyvar_a)
 let fun_ loc params ret = Located.create loc @@ desc_fun params ret
 let fun_printf = Located.less @@ desc_fun_printf
 
@@ -182,7 +182,7 @@ let fun_to_method (f:t) : t =
     | Meta { contents = Some ty } -> to_method ty
     | App (Tycon_fun, recv :: args) -> App (Tycon_method recv, args)
     | Poly { contents = `Preunify (tyvars, ty) } ->
-      Poly (ref (`Preunify (tyvars, (Located.create ty.loc (to_method ty)))))
+      Poly (Ref.create (`Preunify (tyvars, (Located.create ty.loc (to_method ty)))))
     | Poly { contents = `Unify ty } -> to_method ty
     | _ -> failwith "not supported"
   in
@@ -228,7 +228,7 @@ module Spec = struct
     | `Tuple of t list
     | `Range
     | `Option of t
-    | `Box of t
+    | `Ref of t
     | `Fun of t list
     | `Printf
     | `Stream
@@ -243,7 +243,7 @@ module Spec = struct
   let tuple es = `Tuple es
   let range = `Range
   let option e = `Option e
-  let box e = `Box e
+  let ref e = `Ref e
   let printf = `Printf
   let stream = `Stream
 

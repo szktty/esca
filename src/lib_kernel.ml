@@ -11,7 +11,7 @@ let init () =
                 +> typ "Range" Type.range
                 +> typ "List" Type.list_gen
                 +> typ "Option" Type.option_gen
-                +> typ "Box" Type.box_gen
+                +> typ "Ref" Type.ref_gen
                 +> typ "Stream" Type.stream
                 +> fun_ "id" Type.Spec.(a @-> a)
                 +> fun_ "show" Type.Spec.(a @-> void)

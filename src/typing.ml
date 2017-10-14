@@ -66,7 +66,7 @@ and tyexp_desc =
 end
 
 let rec generalize (ty:Type.t) : Type.t =
-  let tyvars : (metavar * tyvar) list ref = ref [] in
+  let tyvars : (metavar * tyvar) list ref = Ref.create [] in
 
   let new_tyvar () =
     Array.get tyvar_names @@ List.length !tyvars
@@ -178,7 +178,7 @@ let rec occur (ref:t option ref) (ty:Type.t) : bool =
       | Tycon_list
       | Tycon_tuple
       | Tycon_option
-      | Tycon_box
+      | Tycon_ref
       | Tycon_fun ->
         List.exists args ~f:(occur ref)
       | Tycon_method recv ->
@@ -205,7 +205,7 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
 
   | App (Tycon_list, [ex]), App (Tycon_list, [ac])
   | App (Tycon_option, [ex]), App (Tycon_option, [ac])
-  | App (Tycon_box, [ex]), App (Tycon_box, [ac]) -> unify ~ex ~ac
+  | App (Tycon_ref, [ex]), App (Tycon_ref, [ac]) -> unify ~ex ~ac
 
   | App (Tycon_tuple, exs), App (Tycon_tuple, acs)
   | App (Tycon_fun, exs), App (Tycon_fun, acs)
@@ -250,7 +250,7 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | _, _ ->
     raise (Unify_error { uniexn_ex = ex; uniexn_ac = ac })
 
-let owner = ref (Module.create "dummy" ~package:"")
+let owner = Ref.create (Module.create "dummy" ~package:"")
 
 let rec infer (e:Ast.t) 
     ~(clos:Closure.t)
