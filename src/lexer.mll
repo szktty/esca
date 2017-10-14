@@ -122,6 +122,7 @@ rule read =
   | "return"    { RETURN }
   | "struct"    { STRUCT }
   | "switch"    { SWITCH }
+  | "tailrec"   { TAILREC }
   | "when"      { WHEN }
   | "false"     { FALSE (to_loc lexbuf) }
   | "true"      { TRUE (to_loc lexbuf) }

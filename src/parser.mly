@@ -92,6 +92,7 @@ let create_unexp op_loc op exp =
 %token RETURN                       (* "return" *)
 %token STRUCT                       (* "struct" *)
 %token SWITCH                       (* "switch" *)
+%token TAILREC                      (* "tailrec" *)
 %token WHEN                         (* "when" *)
 %token HASH_NEW                     (* "#new" *)
 %token EOF
@@ -255,8 +256,14 @@ vardef:
   | PUBLIC LET pattern EQ exp
   { `Vardef { vdef_pub = true; vdef_ptn = $3; vdef_exp = $5 } }
 
+fundef_prefix:
+  | PUBLIC FUNC { [`Public] }
+  | PUBLIC TAILREC FUNC { [`Public; `Tailrec] }
+  | TAILREC FUNC { [`Tailrec] }
+  | FUNC { [] }
+
 fundef:
-  | FUNC var_name LBRACE block RBRACE
+  | fundef_prefix var_name LBRACE block RBRACE
   {
     `Fundef {
         fdef_name = $2;
@@ -266,7 +273,7 @@ fundef:
         fdef_type = Type.metavar None;
     }
   }
-  | FUNC var_name param_list LBRACE block RBRACE
+  | fundef_prefix var_name param_list LBRACE block RBRACE
   {
     `Fundef {
         fdef_name = $2;
@@ -276,7 +283,7 @@ fundef:
         fdef_type = Type.metavar None;
     }
   }
-  | FUNC var_name param_list RARROW type_exp LBRACE block RBRACE
+  | fundef_prefix var_name param_list RARROW type_exp LBRACE block RBRACE
   {
     `Fundef {
         fdef_name = $2;
