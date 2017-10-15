@@ -34,6 +34,10 @@ $ opam pin add esca .
 
 Apache License, Version 2
 
+## Build Tool
+
+[Rugo](https://github.com/szktty/rugo)
+
 ## Specification
 
 ### Top-Level Execution
