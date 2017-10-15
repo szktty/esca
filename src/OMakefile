@@ -180,7 +180,8 @@ FILES[] =
 	lib
 	lib_kernel
 
-PROGRAM = esca
+PROGRAM = escac
+
 # OCAML_LIBS +=
 # OCAML_CLIBS +=
 # OCAML_OTHER_LIBS +=
