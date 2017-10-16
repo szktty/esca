@@ -36,7 +36,7 @@ Apache License, Version 2
 
 ## Build Tool
 
-[Rugo](https://github.com/szktty/rugo)
+[Ysca](https://github.com/szktty/ysca)
 
 ## Specification
 
