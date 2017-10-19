@@ -152,7 +152,7 @@ if $(not $(defined PREFIX))
 	PREFIX = /usr/local
 	export
 
-FILES[] =
+COMMON_FILES[] =
 	position
 	ast
 	ast_intf
@@ -166,7 +166,6 @@ FILES[] =
 	located
 	location
 	logging
-	main
 	module
 	namepath
 	parser
@@ -180,27 +179,38 @@ FILES[] =
 	lib
 	lib_kernel
 
-PROGRAM = escac
+COMP_FILES[] =
+	$(COMMON_FILES)
+	main
+
+PUMP_FILES[] =
+	$(COMMON_FILES)
+	pump
+
+PROG_COMP = escac
+PROG_PUMP = esca-pump
 
 # OCAML_LIBS +=
 # OCAML_CLIBS +=
 # OCAML_OTHER_LIBS +=
 # OCAML_LIB_FLAGS +=
-#
-OCamlProgram($(PROGRAM), $(FILES))
 
-all: $(PROGRAM)
-	mv $(PROGRAM).opt $(PROGRAM)
+OCamlProgram($(PROG_COMP), $(COMP_FILES))
+OCamlProgram($(PROG_PUMP), $(PUMP_FILES))
+
+all: $(PROG_COMP) $(PROG_PUMP)
+	mv $(PROG_COMP).opt $(PROG_COMP)
+	mv $(PROG_PUMP).opt $(PROG_PUMP)
 
 .DEFAULT: all
 
-install: $(PROGRAM) $(OCamlProgramCopy install, $(PREFIX)/bin, $(PROGRAM))
+install: $(PROG_COMP) $(OCamlProgramCopy install, $(PREFIX)/bin, $(PROG_COMP))
 
 uninstall:
-	rm -f $(PREFIX)/bin/$(PROGRAM)
+	rm -f $(PREFIX)/bin/$(PROG_COMP)
 
 clean:
-	rm -rf *.automaton *.conflicts *.annot *.opt *.omc *.cmi *.cmt *.cmti *.cmx *.o $(PROGRAM) parser.ml parser.mli lexer.ml
+	rm -rf *.automaton *.conflicts *.annot *.opt *.omc *.cmi *.cmt *.cmti *.cmx *.o $(PROG_COMP) $(PROG_PUMP) parser.ml parser.mli lexer.ml
 
 # omake xxx.auto.mli creates the mli file from xxx.ml automatically
 %.auto.mli: %.ml
