@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -17,12 +18,18 @@ var helpFlag = flag.Bool("h", false, "Print this message")
 var verboseFlag = flag.Bool("v", false, "Print verbose message")
 var outFlag = flag.String("o", "", "Output file")
 
-func verbose(format string, a ...interface{}) (n int, err error) {
+func verbosef(format string, a ...interface{}) {
 	if *verboseFlag {
-		return fmt.Printf(format, a...)
-	} else {
-		return 0, nil
+		fmt.Printf("# ")
+		fmt.Printf(format, a...)
+		fmt.Printf("\n")
 	}
+}
+
+func errorf(format string, a ...interface{}) {
+	fmt.Printf("Error: ")
+	fmt.Printf(format, a...)
+	fmt.Printf("\n")
 }
 
 func printHelp() {
@@ -59,26 +66,26 @@ func isPublic(name string) bool {
 	return name[0] == strings.ToUpper(name)[0]
 }
 
-type packageInfo struct {
-	name  string
-	path  string
-	decls []string
+type Package struct {
+	name      string
+	path      string
+	funcDecls []string
 }
 
-func createPackageInfo() packageInfo {
-	return packageInfo{decls: []string{}}
+func createPackage() Package {
+	return Package{decls: []string{}}
 }
 
-func (pkg *packageInfo) addDecl(name string) {
-	for _, cur := range pkg.decls {
+func (pkg *Package) addDecl(name string) {
+	for _, cur := range pkg.funcDecls {
 		if cur == name {
 			return
 		}
 	}
-	pkg.decls = append(pkg.decls, name)
+	pkg.funcDecls = append(pkg.decls, name)
 }
 
-func (pkg *packageInfo) parseDecl(file *ast.File, decl ast.Decl) {
+func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
 	structDecl, ok := decl.(*ast.GenDecl)
 	if ok {
 		switch structDecl.Tok {
@@ -105,7 +112,7 @@ func (pkg *packageInfo) parseDecl(file *ast.File, decl ast.Decl) {
 	}
 }
 
-func (pkg *packageInfo) parseFile(importPath string, filePath string) {
+func (pkg *Package) parseFile(importPath string, filePath string) {
 	src, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		panic("not found")
@@ -120,13 +127,13 @@ func (pkg *packageInfo) parseFile(importPath string, filePath string) {
 	pkg.name = file.Name.Name
 
 	fmt.Printf("package name: %s\n", file.Name.Name)
-	fmt.Printf("num decls: %d\n", len(file.Decls))
-	for _, decl := range file.Decls {
+	fmt.Printf("num decls: %d\n", len(file.funcDecls))
+	for _, decl := range file.funcDecls {
 		pkg.parseDecl(file, decl)
 	}
 }
 
-func (pkg *packageInfo) generate(out string) {
+func (pkg *Package) generate(out string) {
 	buf := bytes.NewBufferString("package main\n\n")
 
 	pkg.path = strings.TrimSuffix(pkg.path, "/")
@@ -134,14 +141,28 @@ func (pkg *packageInfo) generate(out string) {
 	fmt.Fprintf(buf, "import \"%s\"\n\n", pkg.path)
 
 	fmt.Fprintf(buf, "func main() {\n")
-	fmt.Fprintf(buf, "    reader := pump.NewReader()\n")
-	for _, decl := range pkg.decls {
+	fmt.Fprintf(buf, "    reader := pump.NewReader(\"%s\", \"%s\")\n",
+		pkg.path, pkg.name)
+	for _, decl := range pkg.funcDecls {
+		// reader.ReadType((*pkg.Recv).Method)
 		fmt.Fprintf(buf, "    reader.ReadType(%s.%s)\n", pkg.name, decl)
 	}
 	fmt.Fprintf(buf, "    reader.Output(\"%s\")\n", out)
 	fmt.Fprintf(buf, "}\n")
 
 	fmt.Printf("\n\n%s\n", buf.String())
+
+	file, err := os.Create(out)
+	if err != nil {
+		errorf("failed create a file", err)
+		os.Exit(1)
+	}
+	_, writeErr := file.WriteString(buf.String())
+	if writeErr != nil {
+		errorf("failed write")
+		os.Exit(1)
+	}
+	file.Close()
 }
 
 func main() {
@@ -153,7 +174,7 @@ func main() {
 	}
 
 	path := os.Args[1]
-	pkg := createPackageInfo()
+	pkg := createPackage()
 	if strings.HasSuffix(path, ".go") {
 		// TODO
 		pkg.parseFile(path, path)
@@ -164,5 +185,12 @@ func main() {
 		}
 	}
 
-	pkg.generate("temp-pump.go")
+	out := fmt.Sprintf("pump_temp_%s.go", pkg.name)
+	pkg.generate(out)
+	cmd := exec.Command("go", "run", out)
+	err := cmd.Run()
+	if err != nil {
+		errorf("failed output temporary file (%s)", err)
+		os.Exit(1)
+	}
 }
