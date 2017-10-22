@@ -67,35 +67,40 @@ func isPublic(name string) bool {
 }
 
 type Package struct {
-	name      string
-	path      string
-	funcDecls []string
-}
-
-func createPackage() Package {
-	return Package{decls: []string{}}
-}
-
-func (pkg *Package) addDecl(name string) {
-	for _, cur := range pkg.funcDecls {
-		if cur == name {
-			return
-		}
-	}
-	pkg.funcDecls = append(pkg.decls, name)
+	name            string
+	path            string
+	typeSpecs       []*ast.TypeSpec
+	structTypeSpecs []*ast.TypeSpec
+	funcDecls       []*ast.FuncDecl
 }
 
 func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
-	structDecl, ok := decl.(*ast.GenDecl)
+	genDecl, ok := decl.(*ast.GenDecl)
 	if ok {
-		switch structDecl.Tok {
+		switch genDecl.Tok {
 		case token.CONST:
 			fmt.Printf("const decl\n")
-			break
+
 		case token.TYPE:
 			fmt.Printf("type decl\n")
-			break
+			typeSpec, ok := genDecl.Specs[0].(*ast.TypeSpec)
+			if !ok {
+				panic("fail cast to type spec")
+			}
+			fmt.Printf("type decl? %s, %s, %s\n", typeSpec.Name.Name, typeSpec, ok)
+			if !isPublic(typeSpec.Name.Name) {
+				break
+			}
+
+			pkg.typeSpecs = append(pkg.typeSpecs, typeSpec)
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if ok {
+				pkg.structTypeSpecs = append(pkg.structTypeSpecs, typeSpec)
+				fmt.Printf("struct type %s\n", structType)
+			}
+
 		default:
+			fmt.Printf("other decl\n")
 			break
 		}
 		return
@@ -106,7 +111,7 @@ func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
 		name := funcDecl.Name.Name
 		fmt.Printf("func decl: %s\n", name)
 		if isPublic(name) {
-			pkg.addDecl(name)
+			pkg.funcDecls = append(pkg.funcDecls, funcDecl)
 		}
 		return
 	}
@@ -127,8 +132,8 @@ func (pkg *Package) parseFile(importPath string, filePath string) {
 	pkg.name = file.Name.Name
 
 	fmt.Printf("package name: %s\n", file.Name.Name)
-	fmt.Printf("num decls: %d\n", len(file.funcDecls))
-	for _, decl := range file.funcDecls {
+	fmt.Printf("num decls: %d\n", len(file.Decls))
+	for _, decl := range file.Decls {
 		pkg.parseDecl(file, decl)
 	}
 }
@@ -143,11 +148,30 @@ func (pkg *Package) generate(out string) {
 	fmt.Fprintf(buf, "func main() {\n")
 	fmt.Fprintf(buf, "    reader := pump.NewReader(\"%s\", \"%s\")\n",
 		pkg.path, pkg.name)
+
+	// struct type
+	for _, typeSpec := range pkg.structTypeSpecs {
+		fmt.Fprintf(buf, "    reader.ReadStructType(%s.%s{})\n",
+			pkg.name, typeSpec.Name.Name)
+	}
+
+	// func decls
 	for _, decl := range pkg.funcDecls {
 		// reader.ReadFuncType((*pkg.Recv).Method)
-		fmt.Fprintf(buf, "    reader.ReadFuncType(%s.%s)\n", pkg.name, decl)
+		if decl.Recv != nil {
+			// TODO: recv.Type == StarExpr, etc.
+			/*
+				recv := decl.Recv.List[0]
+				fmt.Fprintf(buf, "    reader.ReadFuncType(\"%s\", (*%s.%s).%s)\n",
+					decl.Name.Name, pkg.name, recv.Names, decl.Name.Name)
+			*/
+		} else {
+			fmt.Fprintf(buf, "    reader.ReadFuncType(\"%s\", %s.%s)\n",
+				decl.Name.Name, pkg.name, decl.Name.Name)
+		}
 	}
-	fmt.Fprintf(buf, "    reader.Output(\"%s\")\n", out)
+
+	fmt.Fprintf(buf, "    reader.Output(\"%s.escai\")\n", pkg.name)
 	fmt.Fprintf(buf, "}\n")
 
 	fmt.Printf("\n\n%s\n", buf.String())
@@ -157,8 +181,7 @@ func (pkg *Package) generate(out string) {
 		errorf("failed create a file", err)
 		os.Exit(1)
 	}
-	_, writeErr := file.WriteString(buf.String())
-	if writeErr != nil {
+	if _, err = file.WriteString(buf.String()); err != nil {
 		errorf("failed write")
 		os.Exit(1)
 	}
@@ -174,7 +197,7 @@ func main() {
 	}
 
 	path := os.Args[1]
-	pkg := createPackage()
+	pkg := Package{}
 	if strings.HasSuffix(path, ".go") {
 		// TODO
 		pkg.parseFile(path, path)
@@ -188,9 +211,8 @@ func main() {
 	out := fmt.Sprintf("pump_temp_%s.go", pkg.name)
 	pkg.generate(out)
 	cmd := exec.Command("go", "run", out)
-	err := cmd.Run()
-	if err != nil {
-		errorf("failed output temporary file (%s)", err)
+	if err := cmd.Run(); err != nil {
+		errorf("failed getting types (%s)", err)
 		os.Exit(1)
 	}
 }
