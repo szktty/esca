@@ -8,12 +8,22 @@ import (
 )
 
 func EscaVarName(name string) string {
-	head := strings.ToLower(string(name[0]))
-	if len(name) > 0 {
-		return head + name[1:len(name)]
-	} else {
-		return head
+	buf := bytes.NewBufferString("")
+	head := true
+	lower := strings.ToLower(name)
+	for i, c := range name {
+		if head {
+			if name[i] == lower[i] {
+				buf.WriteRune(c)
+				head = false
+			} else {
+				buf.WriteByte(lower[i])
+			}
+		} else {
+			buf.WriteRune(c)
+		}
 	}
+	return buf.String()
 }
 
 func EscaTypeName(ty reflect.Type) string {
@@ -43,26 +53,27 @@ func EscaTypeName(ty reflect.Type) string {
 	case reflect.String:
 		return "String"
 	case reflect.Struct:
-		return ty.Name()
+		return fmt.Sprintf("%s", ty.Name())
 	case reflect.Interface:
 		fmt.Printf("interface %s\n", ty)
 		return ty.Name()
 	case reflect.Ptr:
 		// TODO
-		fmt.Printf("ptr %s\n", ty)
-		return ty.Name()
+		fmt.Printf("ptr %s\n", ty.Elem())
+		return fmt.Sprintf("*%s", EscaTypeName(ty.Elem()))
 	default:
 		panic(fmt.Sprintf("not impl %d (%s)", ty.Kind(), ty))
 	}
 }
 
-func TypeDecl(ty reflect.Type) string {
+func TypeDecl(name string, ty reflect.Type) string {
+	annot := fmt.Sprintf("#name(\"%s\")", name)
+	escaName := EscaVarName(name)
 	buf := bytes.NewBufferString("")
 	kind := ty.Kind()
 	switch kind {
 	case reflect.Struct:
-		fmt.Fprintf(buf, "// %s.%s\n", ty.PkgPath(), ty.Name())
-		fmt.Fprintf(buf, "struct %s {\n", ty.Name())
+		fmt.Fprintf(buf, "%s\nstruct %s {\n", annot, ty.Name())
 		numField := ty.NumField()
 		for i := 0; i < numField; i++ {
 			field := ty.Field(i)
@@ -75,7 +86,7 @@ func TypeDecl(ty reflect.Type) string {
 	case reflect.Func:
 		// TODO: method
 
-		fmt.Fprintf(buf, "func %s(", ty.Name())
+		fmt.Fprintf(buf, "%s\nfunc %s(", annot, escaName)
 
 		numIn := ty.NumIn()
 		for i := 0; i < numIn; i++ {
@@ -172,10 +183,10 @@ func (r *Reader) Writef(format string, a ...interface{}) {
 	fmt.Fprintf(r.buf, format, a...)
 }
 
-func (r *Reader) ReadType(value interface{}) {
+func (r *Reader) ReadFuncType(name string, value interface{}) {
 	ty := reflect.TypeOf(value)
 	r.debugType(ty)
-	r.Writef("%s\n", TypeDecl(ty))
+	r.Writef("%s\n\n", TypeDecl(name, ty))
 }
 
 func (r *Reader) debugType(ty reflect.Type) {

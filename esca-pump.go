@@ -144,8 +144,8 @@ func (pkg *Package) generate(out string) {
 	fmt.Fprintf(buf, "    reader := pump.NewReader(\"%s\", \"%s\")\n",
 		pkg.path, pkg.name)
 	for _, decl := range pkg.funcDecls {
-		// reader.ReadType((*pkg.Recv).Method)
-		fmt.Fprintf(buf, "    reader.ReadType(%s.%s)\n", pkg.name, decl)
+		// reader.ReadFuncType((*pkg.Recv).Method)
+		fmt.Fprintf(buf, "    reader.ReadFuncType(%s.%s)\n", pkg.name, decl)
 	}
 	fmt.Fprintf(buf, "    reader.Output(\"%s\")\n", out)
 	fmt.Fprintf(buf, "}\n")
