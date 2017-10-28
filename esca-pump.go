@@ -74,6 +74,18 @@ type Package struct {
 	funcDecls       []*ast.FuncDecl
 }
 
+func recvTypeName(recv *ast.Field) (star bool, name string) {
+	if starExpr, ok := recv.Type.(*ast.StarExpr); ok {
+		if ident, ok := starExpr.X.(*ast.Ident); ok {
+			return true, ident.Name
+		}
+	}
+	if ident, ok := recv.Type.(*ast.Ident); ok {
+		return false, ident.Name
+	}
+	panic("recv")
+}
+
 func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
 	genDecl, ok := decl.(*ast.GenDecl)
 	if ok {
@@ -110,10 +122,14 @@ func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
 	if ok {
 		name := funcDecl.Name.Name
 		fmt.Printf("func decl: %s\n", name)
-		if isPublic(name) {
+		if funcDecl.Recv != nil {
+			_, recvName := recvTypeName(funcDecl.Recv.List[0])
+			if isPublic(recvName) && isPublic(name) {
+				pkg.funcDecls = append(pkg.funcDecls, funcDecl)
+			}
+		} else if isPublic(name) {
 			pkg.funcDecls = append(pkg.funcDecls, funcDecl)
 		}
-		return
 	}
 }
 
@@ -157,21 +173,24 @@ func (pkg *Package) generate(out string) {
 
 	// func decls
 	for _, decl := range pkg.funcDecls {
-		// reader.ReadFuncType((*pkg.Recv).Method)
 		if decl.Recv != nil {
-			// TODO: recv.Type == StarExpr, etc.
-			/*
-				recv := decl.Recv.List[0]
-				fmt.Fprintf(buf, "    reader.ReadFuncType(\"%s\", (*%s.%s).%s)\n",
-					decl.Name.Name, pkg.name, recv.Names, decl.Name.Name)
-			*/
+			recv := decl.Recv.List[0]
+			star, recvName := recvTypeName(recv)
+			var path string
+			if star {
+				path = fmt.Sprintf("*%s.%s", pkg.name, recvName)
+			} else {
+				path = fmt.Sprintf("%s.%s", pkg.name, recvName)
+			}
+			fmt.Fprintf(buf, "    reader.ReadMethodType(\"%s\", (%s).%s)\n",
+				decl.Name.Name, path, decl.Name.Name)
 		} else {
 			fmt.Fprintf(buf, "    reader.ReadFuncType(\"%s\", %s.%s)\n",
 				decl.Name.Name, pkg.name, decl.Name.Name)
 		}
 	}
 
-	fmt.Fprintf(buf, "    reader.Output(\"%s.escai\")\n", pkg.name)
+	fmt.Fprintf(buf, "    reader.Output(\"%s.esca\")\n", pkg.name)
 	fmt.Fprintf(buf, "}\n")
 
 	fmt.Printf("\n\n%s\n", buf.String())
