@@ -3,6 +3,7 @@ package pump
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 )
@@ -41,13 +42,7 @@ func isPublicType(ty reflect.Type) bool {
 		return isPublicType(ty.Elem())
 
 	case reflect.Struct, reflect.Interface:
-		for i := 0; i < ty.NumField(); i++ {
-			field := ty.Field(i)
-			if !isPublicType(field.Type) {
-				return false
-			}
-		}
-		return true
+		return isPublicName(ty.Name())
 
 	case reflect.Func:
 		for i := 0; i < ty.NumIn(); i++ {
@@ -94,11 +89,26 @@ func typeExpr(ty reflect.Type) string {
 		return "UInt32"
 	case reflect.Uint64:
 		return "UInt64"
+	case reflect.Float32:
+		return "Float32"
+	case reflect.Float64:
+		return "Float64"
+	case reflect.Complex64:
+		return "Complex64"
+	case reflect.Complex128:
+		return "Complex128"
 	case reflect.String:
 		return "String"
 
-	case reflect.Struct, reflect.Interface:
+	case reflect.Struct:
 		return ty.Name()
+
+	case reflect.Interface:
+		if ty.Name() == "error" {
+			return "Error"
+		} else {
+			return ty.Name()
+		}
 
 	case reflect.Ptr:
 		return fmt.Sprintf("*%s", typeExpr(ty.Elem()))
@@ -134,8 +144,21 @@ func typeExpr(ty reflect.Type) string {
 		}
 		return buf.String()
 
+	case reflect.Slice:
+		return fmt.Sprintf("#[%s]", typeExpr(ty.Elem()))
+
+	case reflect.Array:
+		return fmt.Sprintf("#(%s)", typeExpr(ty.Elem()))
+
+	case reflect.Map:
+		// TODO
+		return fmt.Sprintf("[:%s]", typeExpr(ty.Elem()))
+
+	case reflect.Chan:
+		return fmt.Sprintf("Channel<%s>", typeExpr(ty.Elem()))
+
 	default:
-		panic("not impl kind\n")
+		panic(fmt.Sprintf("not impl kind %s\n", kind.String()))
 	}
 }
 
@@ -147,7 +170,7 @@ type Reader struct {
 
 func NewReader(path string, name string) *Reader {
 	r := &Reader{Path: path, Name: name, buf: bytes.NewBufferString("")}
-	r.writef("@import(\"%s\")\n", path)
+	r.writef("@import(\"%s\")\n\n", path)
 	r.writef("package %s\n\n", name)
 	return r
 }
@@ -230,6 +253,12 @@ func (r *Reader) ReadFuncType(name string, value interface{}) {
 	r.writef("\n\n")
 }
 
-func (r *Reader) Output(path string) {
-	fmt.Printf("output\n%s\n", r.buf.String())
+func (r *Reader) Output(path string) error {
+	file, err := os.Create(path)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+	file.WriteString(r.buf.String())
+	return nil
 }
