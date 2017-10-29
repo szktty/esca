@@ -223,6 +223,10 @@ func main() {
 	} else {
 		for _, src := range findDir(path) {
 			fmt.Printf("parse %s\n", src)
+			if strings.HasSuffix(src, "_test.go") {
+				fmt.Printf("skip %s\n", src)
+				continue
+			}
 			pkg.parseFile(path, src)
 		}
 	}
