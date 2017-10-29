@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 )
 
@@ -63,7 +64,50 @@ func findDir(path string) []string {
 }
 
 func isPublic(name string) bool {
-	return name[0] == strings.ToUpper(name)[0]
+	switch name {
+	case "", "bool", "string", "error",
+		"int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+		"byte", "rune", "float32", "float64", "complex64", "complex128":
+		return true
+	default:
+		return name[0] == strings.ToUpper(name)[0]
+	}
+}
+
+func isPublicFieldList(list *ast.FieldList) bool {
+	fields := list.List
+	for i := 0; i < len(fields); i++ {
+		field := fields[i]
+		_, fieldName := fieldTypeName(field)
+		if !isPublic(fieldName) {
+			return false
+		}
+	}
+	return true
+}
+
+func exprTypeName(expr interface{}) string {
+	fmt.Printf("expr type name: %s\n", reflect.TypeOf(expr))
+	if ident, ok := expr.(*ast.Ident); ok {
+		return ident.Name
+	} else if starExpr, ok := expr.(*ast.StarExpr); ok {
+		return exprTypeName(starExpr)
+	} else if selExpr, ok := expr.(*ast.SelectorExpr); ok {
+		return selExpr.Sel.Name
+	} else if _, ok := expr.(*ast.InterfaceType); ok {
+		return ""
+	}
+	panic(fmt.Sprintf("expr %s", expr))
+}
+
+func fieldTypeName(field *ast.Field) (star bool, name string) {
+	fmt.Printf("field type name: %s\n", reflect.TypeOf(field.Type))
+	if starExpr, ok := field.Type.(*ast.StarExpr); ok {
+		return true, exprTypeName(starExpr.X)
+	} else {
+		return false, exprTypeName(field.Type)
+	}
 }
 
 type Package struct {
@@ -74,21 +118,8 @@ type Package struct {
 	funcDecls       []*ast.FuncDecl
 }
 
-func recvTypeName(recv *ast.Field) (star bool, name string) {
-	if starExpr, ok := recv.Type.(*ast.StarExpr); ok {
-		if ident, ok := starExpr.X.(*ast.Ident); ok {
-			return true, ident.Name
-		}
-	}
-	if ident, ok := recv.Type.(*ast.Ident); ok {
-		return false, ident.Name
-	}
-	panic("recv")
-}
-
 func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
-	genDecl, ok := decl.(*ast.GenDecl)
-	if ok {
+	if genDecl, ok := decl.(*ast.GenDecl); ok {
 		switch genDecl.Tok {
 		case token.CONST:
 			fmt.Printf("const decl\n")
@@ -116,21 +147,40 @@ func (pkg *Package) parseDecl(file *ast.File, decl ast.Decl) {
 			break
 		}
 		return
+	} else if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+		pkg.parseFuncDecl(funcDecl)
 	}
+}
 
-	funcDecl, ok := decl.(*ast.FuncDecl)
-	if ok {
-		name := funcDecl.Name.Name
-		fmt.Printf("func decl: %s\n", name)
-		if funcDecl.Recv != nil {
-			_, recvName := recvTypeName(funcDecl.Recv.List[0])
-			if isPublic(recvName) && isPublic(name) {
-				pkg.funcDecls = append(pkg.funcDecls, funcDecl)
-			}
-		} else if isPublic(name) {
-			pkg.funcDecls = append(pkg.funcDecls, funcDecl)
+func (pkg *Package) parseFuncDecl(decl *ast.FuncDecl) {
+	name := decl.Name.Name
+	fmt.Printf("func decl: %s\n", name)
+	if !isPublic(name) {
+		fmt.Printf("not public name\n")
+		return
+	} else if decl.Recv != nil {
+		_, recvName := fieldTypeName(decl.Recv.List[0])
+		if !isPublic(recvName) {
+			fmt.Printf("not public recv name\n")
+			return
 		}
 	}
+
+	if decl.Type.Params != nil {
+		if !isPublicFieldList(decl.Type.Params) {
+			fmt.Printf("not public params\n")
+			return
+		}
+	}
+
+	if decl.Type.Results != nil {
+		if !isPublicFieldList(decl.Type.Results) {
+			fmt.Printf("not public results\n")
+			return
+		}
+	}
+
+	pkg.funcDecls = append(pkg.funcDecls, decl)
 }
 
 func (pkg *Package) parseFile(importPath string, filePath string) {
@@ -175,7 +225,7 @@ func (pkg *Package) generate(out string) {
 	for _, decl := range pkg.funcDecls {
 		if decl.Recv != nil {
 			recv := decl.Recv.List[0]
-			star, recvName := recvTypeName(recv)
+			star, recvName := fieldTypeName(recv)
 			var path string
 			if star {
 				path = fmt.Sprintf("*%s.%s", pkg.name, recvName)
