@@ -90,6 +90,7 @@ let create_unexp op_loc op exp =
 %token PACKAGE                      (* "package" *)
 %token PUBLIC                       (* "public" *)
 %token RETURN                       (* "return" *)
+%token SELF                         (* "self" *)
 %token STRUCT                       (* "struct" *)
 %token SWITCH                       (* "switch" *)
 %token TAILREC                      (* "tailrec" *)
@@ -256,6 +257,7 @@ field_def:
       sdef_field_type = Type.metavar None;
     }
   }
+  | field_attr_list fundef { $2 }
 
 enum_def:
   | ENUM IDENT LBRACE variant_def_list RBRACE { Ast.nop }
@@ -323,9 +325,14 @@ fundef:
     }
   }
 
+(* TODO *)
 param_list:
   | LPAREN RPAREN { [] }
   | LPAREN param_list_body RPAREN { $2 }
+  | LPAREN SELF RPAREN { [] }
+  | LPAREN SELF COMMA param_list_body RPAREN { $4 }
+  | LPAREN AST SELF RPAREN { [] }
+  | LPAREN AST SELF COMMA param_list_body RPAREN { $5 }
 
 param_list_body:
   | rev_param_list { Core.Std.List.rev $1 }

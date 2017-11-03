@@ -163,13 +163,23 @@ func typeExpr(ty reflect.Type) string {
 }
 
 type Reader struct {
-	Path string // package path
-	Name string // package name
-	buf  *bytes.Buffer
+	Path    string // package path
+	Name    string // package name
+	Methods map[string][]method
+	buf     *bytes.Buffer
+}
+
+type method struct {
+	ty   reflect.Type
+	name string
 }
 
 func NewReader(path string, name string) *Reader {
-	r := &Reader{Path: path, Name: name, buf: bytes.NewBufferString("")}
+	r := &Reader{
+		Path:    path,
+		Name:    name,
+		Methods: map[string][]method{},
+		buf:     bytes.NewBufferString("")}
 	r.writef("@import(\"%s\")\n\n", path)
 	r.writef("package %s\n\n", name)
 	return r
@@ -217,10 +227,24 @@ func (r *Reader) readOut(ty reflect.Type) {
 
 func (r *Reader) ReadMethodType(name string, value interface{}) {
 	ty := reflect.TypeOf(value)
-	escaName := escaVarName(name)
-	r.writef("%s func (%s) %s(", mapAnnot(name), typeExpr(ty.In(0)), escaName)
+	recv := typeExpr(ty.In(0))
+	r.Methods[recv] = append(r.Methods[recv], method{ty: ty, name: name})
+}
+
+func (r *Reader) outputMethod(method method) {
+	ty := method.ty
+	escaName := escaVarName(method.name)
+	ptr := ""
+	recvTy := ty.In(0)
+	if recvTy.Kind() == reflect.Ptr {
+		ptr = "*"
+	}
+	r.writef("    %s func %s(%sself", mapAnnot(method.name), escaName, ptr)
 
 	numIn := ty.NumIn()
+	if numIn > 1 {
+		r.writef(", ")
+	}
 	for i := 1; i < numIn; i++ {
 		inTy := ty.In(i)
 		r.writef("%s", typeExpr(inTy))
@@ -231,7 +255,7 @@ func (r *Reader) ReadMethodType(name string, value interface{}) {
 
 	r.writef(") -> ")
 	r.readOut(ty)
-	r.writef("\n\n")
+	r.writef("\n")
 }
 
 func (r *Reader) ReadFuncType(name string, value interface{}) {
@@ -254,6 +278,15 @@ func (r *Reader) ReadFuncType(name string, value interface{}) {
 }
 
 func (r *Reader) Output(path string) error {
+	// methods
+	for name, methods := range r.Methods {
+		r.writef("extension %s {\n", name)
+		for _, method := range methods {
+			r.outputMethod(method)
+		}
+		r.writef("}\n\n")
+	}
+
 	file, err := os.Create(path)
 	defer file.Close()
 	if err != nil {

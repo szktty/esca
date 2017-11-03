@@ -120,6 +120,7 @@ rule read =
   | "package"   { PACKAGE }
   | "public"    { PUBLIC }
   | "return"    { RETURN }
+  | "self"      { SELF }
   | "struct"    { STRUCT }
   | "switch"    { SWITCH }
   | "tailrec"   { TAILREC }
