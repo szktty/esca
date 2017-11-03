@@ -183,12 +183,7 @@ COMP_FILES[] =
 	$(COMMON_FILES)
 	main
 
-PUMP_FILES[] =
-	$(COMMON_FILES)
-	pump
-
 PROG_COMP = escac
-PROG_PUMP = esca-pump
 
 # OCAML_LIBS +=
 # OCAML_CLIBS +=
@@ -196,11 +191,9 @@ PROG_PUMP = esca-pump
 # OCAML_LIB_FLAGS +=
 
 OCamlProgram($(PROG_COMP), $(COMP_FILES))
-OCamlProgram($(PROG_PUMP), $(PUMP_FILES))
 
-all: $(PROG_COMP) $(PROG_PUMP)
+all: $(PROG_COMP)
 	mv $(PROG_COMP).opt $(PROG_COMP)
-	mv $(PROG_PUMP).opt $(PROG_PUMP)
 
 .DEFAULT: all
 
@@ -210,7 +203,7 @@ uninstall:
 	rm -f $(PREFIX)/bin/$(PROG_COMP)
 
 clean:
-	rm -rf *.automaton *.conflicts *.annot *.opt *.omc *.cmi *.cmt *.cmti *.cmx *.o $(PROG_COMP) $(PROG_PUMP) parser.ml parser.mli lexer.ml
+	rm -rf *.automaton *.conflicts *.annot *.opt *.omc *.cmi *.cmt *.cmti *.cmx *.o $(PROG_COMP) parser.ml parser.mli lexer.ml
 
 # omake xxx.auto.mli creates the mli file from xxx.ml automatically
 %.auto.mli: %.ml
