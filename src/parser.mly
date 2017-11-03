@@ -94,6 +94,7 @@ let create_unexp op_loc op exp =
 %token SWITCH                       (* "switch" *)
 %token TAILREC                      (* "tailrec" *)
 %token WHEN                         (* "when" *)
+%token VAR                          (* "var" *)
 %token HASH_NEW                     (* "#new" *)
 %token AT_GO                        (* "@go" *)
 %token AT_IMPORT                    (* "@import" *)
@@ -242,11 +243,16 @@ rev_field_attr_list:
 field_attr:
   | go_attr { $1 }
 
+field_mut:
+  | LET { `Let }
+  | VAR { `Var }
+
 field_def:
-  | field_attr_list IDENT COLON type_exp
+  | field_attr_list field_mut IDENT COLON type_exp
   { { sdef_field_attrs = $1;
-      sdef_field_name = $2;
-      sdef_field_tyexp = $4;
+      sdef_field_mut = $2;
+      sdef_field_name = $3;
+      sdef_field_tyexp = $5;
       sdef_field_type = Type.metavar None;
     }
   }

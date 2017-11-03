@@ -145,10 +145,10 @@ func typeExpr(ty reflect.Type) string {
 		return buf.String()
 
 	case reflect.Slice:
-		return fmt.Sprintf("#[%s]", typeExpr(ty.Elem()))
+		return fmt.Sprintf("[%s]", typeExpr(ty.Elem()))
 
 	case reflect.Array:
-		return fmt.Sprintf("#(%s)", typeExpr(ty.Elem()))
+		return fmt.Sprintf("#[%s]", typeExpr(ty.Elem()))
 
 	case reflect.Map:
 		// TODO
@@ -188,7 +188,7 @@ func (r *Reader) ReadStructType(value interface{}) {
 		if !isPublicName(field.Name) {
 			continue
 		}
-		r.writef("    %s %s: %s\n",
+		r.writef("    %s var %s: %s\n",
 			mapAnnot(field.Name),
 			escaVarName(field.Name),
 			typeExpr(field.Type))

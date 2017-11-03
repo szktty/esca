@@ -123,6 +123,7 @@ and strdef = {
 
 and sdef_field = {
   sdef_field_attrs : t list;
+  sdef_field_mut : [`Var | `Let];
   sdef_field_name : text;
   sdef_field_tyexp : tyexp;
   sdef_field_type : Type.t;

@@ -124,6 +124,7 @@ rule read =
   | "switch"    { SWITCH }
   | "tailrec"   { TAILREC }
   | "when"      { WHEN }
+  | "var"       { VAR }
   | "false"     { FALSE (to_loc lexbuf) }
   | "true"      { TRUE (to_loc lexbuf) }
   | "#new"      { HASH_NEW }
