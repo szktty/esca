@@ -188,7 +188,7 @@ func (r *Reader) ReadStructType(value interface{}) {
 		if !isPublicName(field.Name) {
 			continue
 		}
-		r.writef("    %s var %s: %s\n",
+		r.writef("    %s %s: %s\n",
 			mapAnnot(field.Name),
 			escaVarName(field.Name),
 			typeExpr(field.Type))
