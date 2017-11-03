@@ -40,10 +40,13 @@ and tyexp_desc =
   | Ty_list of tyexp
   | Ty_tuple of tyexp list
   | Ty_option of tyexp
+  | Ty_ref of tyexp
 
 type t = [
   | `Nop of Location.t (* internal use *)
   | `Chunk of chunk
+  | `Import_attr of text
+  | `Go_attr of text
   | `Package of text
   | `Vardef of vardef
   | `Assign of assign
@@ -119,6 +122,7 @@ and strdef = {
 }
 
 and sdef_field = {
+  sdef_field_attrs : t list;
   sdef_field_name : text;
   sdef_field_tyexp : tyexp;
   sdef_field_type : Type.t;

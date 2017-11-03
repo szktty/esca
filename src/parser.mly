@@ -95,11 +95,13 @@ let create_unexp op_loc op exp =
 %token TAILREC                      (* "tailrec" *)
 %token WHEN                         (* "when" *)
 %token HASH_NEW                     (* "#new" *)
+%token AT_GO                        (* "@go" *)
+%token AT_IMPORT                    (* "@import" *)
 %token EOF
 
 %left OR AND
 %right EQ LARROW
-%nonassoc NE EQQ
+%nonassoc NE EQQ Q
 %left LT GT LE GE
 %left RPIPE LPIPE
 %nonassoc DOT2LT DOT3
@@ -134,6 +136,7 @@ rev_attr_list:
   | rev_attr_list SEMI attr { $3 :: $1 }
 
 attr:
+  | AT_IMPORT LPAREN STRING RPAREN { `Import_attr $3 }
   | PACKAGE IDENT { `Package $2 }
 
 top_stat_list:
@@ -204,7 +207,16 @@ module_def:
   | MODULE LBRACE RBRACE { Ast.nop }
   | MODULE LBRACE top_stat_list RBRACE { Ast.nop }
 
+go_attr:
+  | AT_GO LPAREN IDENT RPAREN { `Go_attr $3 }
+
 struct_def:
+  | STRUCT IDENT LBRACE RBRACE
+  { `Strdef { sdef_name = $2;
+      sdef_fields = [];
+      sdef_type = Type.metavar None;
+    }
+  }
   | STRUCT IDENT LBRACE field_def_list RBRACE
   { `Strdef { sdef_name = $2;
       sdef_fields = $4;
@@ -218,12 +230,23 @@ field_def_list:
 rev_field_def_list:
   | field_def { [$1] }
   | rev_field_def_list field_def { $2 :: $1 }
-  | rev_field_def_list COMMA field_def { $3 :: $1 }
+
+field_attr_list:
+  | (* empty *) { [] }
+  | rev_field_attr_list { Core.Std.List.rev $1 }
+
+rev_field_attr_list:
+  | field_attr { [$1] }
+  | rev_field_attr_list field_attr { $2 :: $1 }
+
+field_attr:
+  | go_attr { $1 }
 
 field_def:
-  | IDENT COLON type_exp
-  { { sdef_field_name = $1;
-      sdef_field_tyexp = $3;
+  | field_attr_list IDENT COLON type_exp
+  { { sdef_field_attrs = $1;
+      sdef_field_name = $2;
+      sdef_field_tyexp = $4;
       sdef_field_type = Type.metavar None;
     }
   }
@@ -605,11 +628,10 @@ tuple_ptn:
 
 type_exp:
   | simple_type_exp { $1 }
-  | simple_type_exp Q { less @@ Ty_option $1 }
   | simple_type_exp LT type_stat_list GT
   { less @@ Ty_app ($1, $3) }
-  | simple_type_exp LT type_stat_list GT Q
-  { less @@ Ty_option (less @@ Ty_app ($1, $3)) }
+  | AST type_exp { less @@ Ty_ref $2 }
+  | type_exp Q { less @@ Ty_option $1 }
 
 type_stat_list:
   | rev_type_stat_list { Core.Std.List.rev $1 }

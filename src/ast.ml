@@ -297,6 +297,9 @@ and write_tyexp (buf:Buffer.t) tyexp =
   | Ty_option e ->
     write_tyexp buf e;
     add_string buf "?"
+  | Ty_ref e ->
+    add_string buf "*";
+    write_tyexp buf e
 
 let to_string node =
   let buf = Buffer.create 16 in

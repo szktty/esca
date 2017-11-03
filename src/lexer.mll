@@ -127,6 +127,8 @@ rule read =
   | "false"     { FALSE (to_loc lexbuf) }
   | "true"      { TRUE (to_loc lexbuf) }
   | "#new"      { HASH_NEW }
+  | "@go"       { AT_GO }
+  | "@import"   { AT_IMPORT }
   | ident       { IDENT (to_word lexbuf) }
   | _           { raise (Syntax_error (start_pos lexbuf, "Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof         { EOF }
