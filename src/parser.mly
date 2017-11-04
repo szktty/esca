@@ -215,13 +215,13 @@ go_attr:
 struct_def:
   | STRUCT IDENT LBRACE RBRACE
   { `Strdef { sdef_name = $2;
-      sdef_fields = [];
+      sdef_items = [];
       sdef_type = Type.metavar None;
     }
   }
   | STRUCT IDENT LBRACE field_def_list RBRACE
   { `Strdef { sdef_name = $2;
-      sdef_fields = $4;
+      sdef_items = $4;
       sdef_type = Type.metavar None;
     }
   }
@@ -250,14 +250,20 @@ field_mut:
 
 field_def:
   | field_attr_list field_mut IDENT COLON type_exp
-  { { sdef_field_attrs = $1;
+  { `Sdef_field {
+      sdef_field_attrs = $1;
       sdef_field_mut = $2;
       sdef_field_name = $3;
       sdef_field_tyexp = $5;
       sdef_field_type = Type.metavar None;
     }
   }
-  | field_attr_list fundef { $2 }
+  | field_attr_list fundef
+  { `Sdef_method {
+      sdef_meth_attrs = $1;
+      sdef_meth_fdef = $2;
+    }
+  }
 
 enum_def:
   | ENUM IDENT LBRACE variant_def_list RBRACE { Ast.nop }
@@ -294,16 +300,6 @@ fundef_prefix:
   | FUNC { [] }
 
 fundef:
-  | fundef_prefix var_name LBRACE block RBRACE
-  {
-    `Fundef {
-        fdef_name = $2;
-        fdef_params = [];
-        fdef_ret = None;
-        fdef_block = $4;
-        fdef_type = Type.metavar None;
-    }
-  }
   | fundef_prefix var_name param_list LBRACE block RBRACE
   {
     `Fundef {

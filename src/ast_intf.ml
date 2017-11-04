@@ -52,6 +52,8 @@ type t = [
   | `Assign of assign
   | `Fundef of fundef
   | `Strdef of strdef
+  | `Sdef_field of sdef_field
+  | `Sdef_method of sdef_method
   | `Return of t option
   | `If of if_
   | `For of for_
@@ -117,7 +119,7 @@ and fun_body = {
 
 and strdef = {
   sdef_name : text;
-  sdef_fields : sdef_field list;
+  sdef_items : t list;
   sdef_type : Type.t;
 }
 
@@ -127,6 +129,11 @@ and sdef_field = {
   sdef_field_name : text;
   sdef_field_tyexp : tyexp;
   sdef_field_type : Type.t;
+}
+
+and sdef_method = {
+  sdef_meth_attrs : t list;
+  sdef_meth_fdef : t;
 }
 
 and var = {

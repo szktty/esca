@@ -93,12 +93,18 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     add_string "(strdef ";
     write_text sdef.sdef_name;
     add_string " {";
-    List.iter sdef.sdef_fields ~f:(fun fld ->
-        write_text fld.sdef_field_name;
-        add_string ":";
-        write_tyexp buf fld.sdef_field_tyexp;
-        add_string ", ");
+    write_nodes sdef.sdef_items;
     add_string "})"
+  | `Sdef_field field ->
+    add_string "(sdef_field ";
+    write_text field.sdef_field_name;
+    add_string ":";
+    write_tyexp buf field.sdef_field_tyexp;
+    add_string ")"
+  | `Sdef_method meth ->
+    add_string "(sdef_method ";
+    write meth.sdef_meth_fdef;
+    add_string ")"
   | `Assign assign ->
     add_string "(assign ";
     write assign.asg_var;
