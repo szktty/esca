@@ -76,6 +76,7 @@ let create_unexp op_loc op exp =
 %token ELSE                         (* "else" *)
 %token ELSEIF                       (* "elseif" *)
 %token ENUM                         (* "enum" *)
+%token EXTENSION                    (* "extension" *)
 %token FOR                          (* "for" *)
 %token FUNC                         (* "func" *)
 %token IF                           (* "if" *)
@@ -86,7 +87,6 @@ let create_unexp op_loc op exp =
 %token LSL                          (* "lsl" *)
 %token LSR                          (* "lsr" *)
 %token LXOR                         (* "lxor" *)
-%token MODULE                       (* "module" *)
 %token PACKAGE                      (* "package" *)
 %token PUBLIC                       (* "public" *)
 %token RETURN                       (* "return" *)
@@ -99,6 +99,7 @@ let create_unexp op_loc op exp =
 %token HASH_NEW                     (* "#new" *)
 %token AT_GO                        (* "@go" *)
 %token AT_IMPORT                    (* "@import" *)
+%token AT_NATIVE                    (* "@native" *)
 %token EOF
 
 %left OR AND
@@ -152,11 +153,12 @@ rev_top_stat_list:
 
 top_stat:
   | directive { $1 }
-  | module_def { $1 }
   | struct_def { $1 }
   | enum_def { $1 }
+  | extension { $1 }
   | vardef { $1 }
   | fundef { $1 }
+  | fundecl { $1 }
 
 block:
   | (* empty *) { [] }
@@ -205,10 +207,6 @@ rev_exp_list:
   | exp { [$1] }
   | rev_exp_list COMMA exp { $3 :: $1 }
 
-module_def:
-  | MODULE LBRACE RBRACE { Ast.nop }
-  | MODULE LBRACE top_stat_list RBRACE { Ast.nop }
-
 go_attr:
   | AT_GO LPAREN IDENT RPAREN { `Go_attr $3 }
 
@@ -233,15 +231,14 @@ rev_field_def_list:
   | field_def { [$1] }
   | rev_field_def_list field_def { $2 :: $1 }
 
-field_attr_list:
-  | (* empty *) { [] }
-  | rev_field_attr_list { Core.Std.List.rev $1 }
+def_attr_list:
+  | rev_def_attr_list { Core.Std.List.rev $1 }
 
-rev_field_attr_list:
-  | field_attr { [$1] }
-  | rev_field_attr_list field_attr { $2 :: $1 }
+rev_def_attr_list:
+  | def_attr { [$1] }
+  | rev_def_attr_list def_attr { $2 :: $1 }
 
-field_attr:
+def_attr:
   | go_attr { $1 }
 
 field_mut:
@@ -249,19 +246,22 @@ field_mut:
   | VAR { `Var }
 
 field_def:
-  | field_attr_list field_mut IDENT COLON type_exp
+  | field_mut IDENT COLON type_exp
+  { `Sdef_field {
+      sdef_field_attrs = [];
+      sdef_field_mut = $1;
+      sdef_field_name = $2;
+      sdef_field_tyexp = $4;
+      sdef_field_type = Type.metavar None;
+    }
+  }
+  | def_attr_list field_mut IDENT COLON type_exp
   { `Sdef_field {
       sdef_field_attrs = $1;
       sdef_field_mut = $2;
       sdef_field_name = $3;
       sdef_field_tyexp = $5;
       sdef_field_type = Type.metavar None;
-    }
-  }
-  | field_attr_list fundef
-  { `Sdef_method {
-      sdef_meth_attrs = $1;
-      sdef_meth_fdef = $2;
     }
   }
 
@@ -287,7 +287,25 @@ rev_variant_param_list:
   | type_exp { [$1] }
   | rev_variant_param_list COMMA type_exp { $3 :: $1 }
 
+extension:
+  | EXTENSION type_exp LBRACE RBRACE
+  { `Extension {
+        ext_tyexp = $2;
+        ext_items = [];
+    }
+  }
+  | EXTENSION type_exp LBRACE top_stat_list RBRACE
+  { `Extension {
+        ext_tyexp = $2;
+        ext_items = $4;
+    }
+  }
+
 vardef:
+  | VAR pattern EQ exp
+  { `Vardef { vdef_pub = false; vdef_ptn = $2; vdef_exp = $4 } }
+  | PUBLIC VAR pattern EQ exp
+  { `Vardef { vdef_pub = true; vdef_ptn = $3; vdef_exp = $5 } }
   | LET pattern EQ exp
   { `Vardef { vdef_pub = false; vdef_ptn = $2; vdef_exp = $4 } }
   | PUBLIC LET pattern EQ exp
@@ -310,6 +328,16 @@ fundef:
         fdef_type = Type.metavar None;
     }
   }
+  | def_attr_list fundef_prefix var_name param_list LBRACE block RBRACE
+  {
+    `Fundef {
+        fdef_name = $3;
+        fdef_params = $4;
+        fdef_ret = None;
+        fdef_block = $6;
+        fdef_type = Type.metavar None;
+    }
+  }
   | fundef_prefix var_name param_list RARROW type_exp LBRACE block RBRACE
   {
     `Fundef {
@@ -320,8 +348,59 @@ fundef:
         fdef_type = Type.metavar None;
     }
   }
+  | def_attr_list fundef_prefix var_name param_list RARROW type_exp LBRACE block RBRACE
+  {
+    `Fundef {
+        fdef_name = $3;
+        fdef_params = $4;
+        fdef_ret = Some $6;
+        fdef_block = $8;
+        fdef_type = Type.metavar None;
+    }
+  }
 
-(* TODO *)
+fundecl:
+  | AT_NATIVE FUNC var_name param_list 
+  {
+    `Fundecl {
+        fdecl_attrs = [];
+        fdecl_name = $3;
+        fdecl_params = $4;
+        fdecl_ret = None;
+        fdecl_type = Type.void;
+    }
+  }
+  | AT_NATIVE def_attr_list FUNC var_name param_list 
+  {
+    `Fundecl {
+        fdecl_attrs = $2;
+        fdecl_name = $4;
+        fdecl_params = $5;
+        fdecl_ret = None;
+        fdecl_type = Type.void;
+    }
+  }
+  | AT_NATIVE FUNC var_name param_list RARROW type_exp
+  {
+    `Fundecl {
+        fdecl_attrs = [];
+        fdecl_name = $3;
+        fdecl_params = $4;
+        fdecl_ret = Some $6;
+        fdecl_type = Type.metavar None;
+    }
+  }
+  | AT_NATIVE def_attr_list FUNC var_name param_list RARROW type_exp
+  {
+    `Fundecl {
+        fdecl_attrs = $2;
+        fdecl_name = $4;
+        fdecl_params = $5;
+        fdecl_ret = Some $7;
+        fdecl_type = Type.metavar None;
+    }
+  }
+
 param_list:
   | LPAREN RPAREN { [] }
   | LPAREN param_list_body RPAREN { $2 }

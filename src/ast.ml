@@ -101,10 +101,6 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     add_string ":";
     write_tyexp buf field.sdef_field_tyexp;
     add_string ")"
-  | `Sdef_method meth ->
-    add_string "(sdef_method ";
-    write meth.sdef_meth_fdef;
-    add_string ")"
   | `Assign assign ->
     add_string "(assign ";
     write assign.asg_var;

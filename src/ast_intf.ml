@@ -48,12 +48,13 @@ type t = [
   | `Import_attr of text
   | `Go_attr of text
   | `Package of text
+  | `Extension of extension
   | `Vardef of vardef
   | `Assign of assign
   | `Fundef of fundef
+  | `Fundecl of fundecl
   | `Strdef of strdef
   | `Sdef_field of sdef_field
-  | `Sdef_method of sdef_method
   | `Return of t option
   | `If of if_
   | `For of for_
@@ -85,6 +86,11 @@ and chunk = {
   ch_stats : t list;
 }
 
+and extension = {
+  ext_tyexp : tyexp;
+  ext_items : t list;
+}
+
 and exp = {
   exp : t;
   exp_type : Type.t;
@@ -102,6 +108,8 @@ and vardef = {
   vdef_exp : t;
 }
 
+and fundef_prefix = [`Public | `Tailrec]
+
 and fundef = {
   fdef_name : text;
   fdef_params : text list;
@@ -117,6 +125,14 @@ and fun_body = {
   fbody_type : Type.t;
 }
 
+and fundecl = {
+  fdecl_attrs : t list;
+  fdecl_name : text;
+  fdecl_params : text list;
+  fdecl_ret : tyexp option;
+  fdecl_type : Type.t;
+}
+
 and strdef = {
   sdef_name : text;
   sdef_items : t list;
@@ -129,11 +145,6 @@ and sdef_field = {
   sdef_field_name : text;
   sdef_field_tyexp : tyexp;
   sdef_field_type : Type.t;
-}
-
-and sdef_method = {
-  sdef_meth_attrs : t list;
-  sdef_meth_fdef : t;
 }
 
 and var = {

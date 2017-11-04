@@ -106,6 +106,7 @@ rule read =
   | "default"   { DEFAULT }
   | "else"      { ELSE }
   | "enum"      { ENUM }
+  | "extension" { EXTENSION }
   | "for"       { FOR }
   | "func"      { FUNC }
   | "if"        { IF }
@@ -116,7 +117,6 @@ rule read =
   | "lsl"       { LSL }
   | "lsr"       { LSR }
   | "lxor"      { LXOR }
-  | "module"    { MODULE }
   | "package"   { PACKAGE }
   | "public"    { PUBLIC }
   | "return"    { RETURN }
@@ -131,6 +131,7 @@ rule read =
   | "#new"      { HASH_NEW }
   | "@go"       { AT_GO }
   | "@import"   { AT_IMPORT }
+  | "@native"   { AT_NATIVE }
   | ident       { IDENT (to_word lexbuf) }
   | _           { raise (Syntax_error (start_pos lexbuf, "Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof         { EOF }
