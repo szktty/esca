@@ -223,6 +223,8 @@ func (pkg *Package) generate(out string) {
 
 	// func decls
 	for _, decl := range pkg.funcDecls {
+		params := decl.Type.Params.List
+		numParams := len(params)
 		if decl.Recv != nil {
 			recv := decl.Recv.List[0]
 			star, recvName := fieldTypeName(recv)
@@ -232,12 +234,21 @@ func (pkg *Package) generate(out string) {
 			} else {
 				path = fmt.Sprintf("%s.%s", pkg.name, recvName)
 			}
-			fmt.Fprintf(buf, "    reader.ReadMethodType(\"%s\", (%s).%s)\n",
+			fmt.Fprintf(buf, "    reader.ReadMethodType(\"%s\", (%s).%s",
 				decl.Name.Name, path, decl.Name.Name)
 		} else {
-			fmt.Fprintf(buf, "    reader.ReadFuncType(\"%s\", %s.%s)\n",
+			fmt.Fprintf(buf, "    reader.ReadFuncType(\"%s\", %s.%s",
 				decl.Name.Name, pkg.name, decl.Name.Name)
 		}
+
+		fmt.Fprintf(buf, ", []string{")
+		for i := 0; i < numParams; i++ {
+			numNames := len(params[i].Names)
+			for j := 0; j < numNames; j++ {
+				fmt.Fprintf(buf, "\"%s\", ", params[i].Names[j])
+			}
+		}
+		fmt.Fprintf(buf, "})\n")
 	}
 
 	fmt.Fprintf(buf, "    reader.Output(\"%s.esca\")\n", pkg.name)

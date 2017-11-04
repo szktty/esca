@@ -170,8 +170,9 @@ type Reader struct {
 }
 
 type method struct {
-	ty   reflect.Type
-	name string
+	ty     reflect.Type
+	name   string
+	params []string
 }
 
 func NewReader(path string, name string) *Reader {
@@ -225,10 +226,10 @@ func (r *Reader) readOut(ty reflect.Type) {
 	}
 }
 
-func (r *Reader) ReadMethodType(name string, value interface{}) {
+func (r *Reader) ReadMethodType(name string, value interface{}, params []string) {
 	ty := reflect.TypeOf(value)
 	recv := typeExpr(ty.In(0))
-	r.Methods[recv] = append(r.Methods[recv], method{ty: ty, name: name})
+	r.Methods[recv] = append(r.Methods[recv], method{ty: ty, name: name, params: params})
 }
 
 func (r *Reader) outputMethod(method method) {
@@ -239,7 +240,7 @@ func (r *Reader) outputMethod(method method) {
 	if recvTy.Kind() == reflect.Ptr {
 		ptr = "*"
 	}
-	r.writef("    %s func %s(%sself", mapAnnot(method.name), escaName, ptr)
+	r.writef("    @native %s func %s(%sself", mapAnnot(method.name), escaName, ptr)
 
 	numIn := ty.NumIn()
 	if numIn > 1 {
@@ -247,7 +248,7 @@ func (r *Reader) outputMethod(method method) {
 	}
 	for i := 1; i < numIn; i++ {
 		inTy := ty.In(i)
-		r.writef("%s", typeExpr(inTy))
+		r.writef("%s: %s", method.params[i-1], typeExpr(inTy))
 		if i+1 < numIn {
 			r.writef(", ")
 		}
@@ -258,15 +259,15 @@ func (r *Reader) outputMethod(method method) {
 	r.writef("\n")
 }
 
-func (r *Reader) ReadFuncType(name string, value interface{}) {
+func (r *Reader) ReadFuncType(name string, value interface{}, params []string) {
 	ty := reflect.TypeOf(value)
 	escaName := escaVarName(name)
-	r.writef("%s func %s(", mapAnnot(name), escaName)
+	r.writef("@native %s func %s(", mapAnnot(name), escaName)
 
 	numIn := ty.NumIn()
 	for i := 0; i < numIn; i++ {
 		inTy := ty.In(i)
-		r.writef("%s", typeExpr(inTy))
+		r.writef("%s: %s", params[i], typeExpr(inTy))
 		if i+1 < numIn {
 			r.writef(", ")
 		}
