@@ -104,10 +104,14 @@ func typeExpr(ty reflect.Type) string {
 		return ty.Name()
 
 	case reflect.Interface:
-		if ty.Name() == "error" {
+		name := ty.Name()
+		switch name {
+		case "error":
 			return "Error"
-		} else {
-			return ty.Name()
+		case "":
+			return "Any"
+		default:
+			return name
 		}
 
 	case reflect.Ptr:

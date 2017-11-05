@@ -11,6 +11,7 @@ and desc =
   | Meta of metavar
 
 and tycon =
+  | Tycon_any
   | Tycon_void
   | Tycon_bool
   | Tycon_int
@@ -82,6 +83,7 @@ let rec to_string (ty:t) =
       (to_string ty) (Namepath.to_string path) 
 
 and tycon_to_string = function
+  | Tycon_any -> "Any"
   | Tycon_void -> "Void"
   | Tycon_bool -> "Bool"
   | Tycon_int -> "Int"
@@ -145,6 +147,7 @@ let tyvar_d = tyvar "d"
 let poly tyvars (ty:t) : desc = Poly (ref (`Preunify (tyvars, ty)))
 
 let app ?(args=[]) tycon = App (tycon, args)
+let desc_any = app Tycon_any
 let desc_void = app Tycon_void
 let desc_bool = app Tycon_bool
 let desc_int = app Tycon_int
@@ -219,6 +222,7 @@ module Spec = struct
 
   type t = [
     | `Tyvar of string
+    | `Any
     | `Void
     | `Bool
     | `Int
@@ -234,6 +238,7 @@ module Spec = struct
     | `Stream
   ]
 
+  let any = `Any
   let void = `Void
   let bool = `Bool
   let int = `Int
