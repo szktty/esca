@@ -56,9 +56,11 @@ type t = [
   | `Strdef of strdef
   | `Sdef_field of sdef_field
   | `Return of t option
+  | `Break
   | `If of if_
   | `For of for_
   | `Switch of switch
+  | `Tyswitch of type_switch
   | `Block of t list
   | `Funcall of funcall
   | `Binexp of binexp
@@ -180,6 +182,22 @@ and switch_cls = {
   sw_cls_guard : t option;
   sw_cls_action : t list;
   sw_cls_act_type : Type.t;
+}
+
+and type_switch = {
+  tysw_val : t;
+  tysw_cls : type_switch_cls list;
+  tysw_default : t list option;
+  tysw_val_type : Type.t;
+  tysw_cls_type : Type.t;
+}
+
+and type_switch_cls = {
+  tysw_cls_var : text option;
+  tysw_cls_ptn : tyexp;
+  tysw_cls_guard : t option;
+  tysw_cls_action : t list;
+  tysw_cls_act_type : Type.t;
 }
 
 and funcall = {

@@ -71,12 +71,14 @@ let create_unexp op_loc op exp =
 %token <Location.t> FNEG            (* for negative float *)
 %token <Location.t> AND             (* "and" *)
 %token <Location.t> OR              (* "or" *)
+%token BREAK                        (* "break" *)
 %token CASE                         (* "case" *)
 %token DEFAULT                      (* "default" *)
 %token ELSE                         (* "else" *)
 %token ELSEIF                       (* "elseif" *)
 %token ENUM                         (* "enum" *)
 %token EXTENSION                    (* "extension" *)
+%token EXTERN                       (* "extern" *)
 %token FOR                          (* "for" *)
 %token FUNC                         (* "func" *)
 %token IF                           (* "if" *)
@@ -94,12 +96,13 @@ let create_unexp op_loc op exp =
 %token STRUCT                       (* "struct" *)
 %token SWITCH                       (* "switch" *)
 %token TAILREC                      (* "tailrec" *)
+%token TYPEALIAS                    (* "typealias" *)
+%token TYPESWITCH                   (* "typeswitch" *)
 %token WHEN                         (* "when" *)
 %token VAR                          (* "var" *)
 %token HASH_NEW                     (* "#new" *)
 %token AT_GO                        (* "@go" *)
 %token AT_IMPORT                    (* "@import" *)
-%token AT_NATIVE                    (* "@native" *)
 %token EOF
 
 %left OR AND
@@ -187,11 +190,13 @@ stat:
   { `For { for_var = $2; for_range = $4; for_block = $6 } }
   | if_stat { $1 }
   | switch_stat { $1 }
+  | typeswitch_stat { $1 }
   | funcall %prec app { $1 }
 
 last_stat:
   | RETURN { `Return None }
   | RETURN exp { `Return (Some $2) }
+  | BREAK { `Break }
 
 exp:
   | fun_exp { $1 }
@@ -312,10 +317,10 @@ vardef:
   { `Vardef { vdef_pub = true; vdef_ptn = $3; vdef_exp = $5 } }
 
 fundef_prefix:
+  | FUNC { [] }
   | PUBLIC FUNC { [`Public] }
   | PUBLIC TAILREC FUNC { [`Public; `Tailrec] }
   | TAILREC FUNC { [`Tailrec] }
-  | FUNC { [] }
 
 fundef:
   | fundef_prefix var_name param_list LBRACE block RBRACE
@@ -360,7 +365,7 @@ fundef:
   }
 
 fundecl:
-  | AT_NATIVE FUNC var_name param_list 
+  | EXTERN FUNC var_name param_list 
   {
     `Fundecl {
         fdecl_attrs = [];
@@ -370,17 +375,17 @@ fundecl:
         fdecl_type = Type.void;
     }
   }
-  | AT_NATIVE def_attr_list FUNC var_name param_list 
+  | def_attr_list EXTERN FUNC var_name param_list 
   {
     `Fundecl {
-        fdecl_attrs = $2;
+        fdecl_attrs = $1;
         fdecl_name = $4;
         fdecl_params = $5;
         fdecl_ret = None;
         fdecl_type = Type.void;
     }
   }
-  | AT_NATIVE FUNC var_name param_list RARROW type_exp
+  | EXTERN FUNC var_name param_list RARROW type_exp
   {
     `Fundecl {
         fdecl_attrs = [];
@@ -390,10 +395,10 @@ fundecl:
         fdecl_type = Type.metavar None;
     }
   }
-  | AT_NATIVE def_attr_list FUNC var_name param_list RARROW type_exp
+  | def_attr_list EXTERN FUNC var_name param_list RARROW type_exp
   {
     `Fundecl {
-        fdecl_attrs = $2;
+        fdecl_attrs = $1;
         fdecl_name = $4;
         fdecl_params = $5;
         fdecl_ret = Some $7;
@@ -469,11 +474,27 @@ switch_stat:
         sw_val_type = Type.metavar None;
         sw_cls_type = Type.metavar None; }
   }
+  | SWITCH LET IDENT EQ exp LBRACE sw_clause_list RBRACE
+  { `Switch {
+        sw_val = $5;
+        sw_cls = $7;
+        sw_default = None;
+        sw_val_type = Type.metavar None;
+        sw_cls_type = Type.metavar None; }
+  }
   | SWITCH exp LBRACE sw_clause_list DEFAULT COLON block RBRACE
   { `Switch {
         sw_val = $2;
         sw_cls = $4;
         sw_default = Some $7;
+        sw_val_type = Type.metavar None;
+        sw_cls_type = Type.metavar None; }
+  }
+  | SWITCH LET IDENT EQ exp LBRACE sw_clause_list DEFAULT COLON block RBRACE
+  { `Switch {
+        sw_val = $5;
+        sw_cls = $7;
+        sw_default = Some $10;
         sw_val_type = Type.metavar None;
         sw_cls_type = Type.metavar None; }
   }
@@ -502,6 +523,65 @@ sw_clause:
 sw_pattern:
   | pattern { ($1, None) }
   | pattern WHEN exp { ($1, Some $3) }
+
+typeswitch_stat:
+  | TYPESWITCH exp LBRACE tysw_clause_list RBRACE
+  { `Tyswitch {
+        tysw_val = $2;
+        tysw_cls = $4;
+        tysw_default = None;
+        tysw_val_type = Type.metavar None;
+        tysw_cls_type = Type.metavar None; }
+  }
+  | TYPESWITCH LET IDENT EQ exp LBRACE tysw_clause_list RBRACE
+  { `Tyswitch {
+        tysw_val = $5;
+        tysw_cls = $7;
+        tysw_default = None;
+        tysw_val_type = Type.metavar None;
+        tysw_cls_type = Type.metavar None; }
+  }
+  | TYPESWITCH exp LBRACE tysw_clause_list DEFAULT COLON block RBRACE
+  { `Tyswitch {
+        tysw_val = $2;
+        tysw_cls = $4;
+        tysw_default = Some $7;
+        tysw_val_type = Type.metavar None;
+        tysw_cls_type = Type.metavar None; }
+  }
+  | TYPESWITCH LET IDENT EQ exp LBRACE tysw_clause_list DEFAULT COLON block RBRACE
+  { `Tyswitch {
+        tysw_val = $5;
+        tysw_cls = $7;
+        tysw_default = Some $10;
+        tysw_val_type = Type.metavar None;
+        tysw_cls_type = Type.metavar None; }
+  }
+
+tysw_clause_list:
+  | rev_tysw_clause_list { Core.Std.List.rev $1 }
+
+rev_tysw_clause_list:
+  | tysw_clause { [$1] }
+  | rev_tysw_clause_list tysw_clause { $2 :: $1 }
+
+tysw_clause:
+  | CASE tysw_pattern COLON block
+  { { Ast.tysw_cls_var = None;
+      tysw_cls_ptn = fst $2;
+      tysw_cls_guard = snd $2;
+      tysw_cls_action = $4;
+      tysw_cls_act_type = Type.metavar None } }
+  | CASE IDENT EQ tysw_pattern COLON block
+  { { Ast.tysw_cls_var = Some $2;
+      tysw_cls_ptn = fst $4;
+      tysw_cls_guard = snd $4;
+      tysw_cls_action = $6;
+      tysw_cls_act_type = Type.metavar None } }
+
+tysw_pattern:
+  | type_exp { ($1, None) }
+  | type_exp WHEN exp { ($1, Some $3) }
 
 funcall:
   | var_name fun_exp

@@ -102,11 +102,13 @@ rule read =
   | "|>"        { RPIPE (to_loc lexbuf) }
   | "and"       { AND (to_loc lexbuf) }
   | "or"        { OR (to_loc lexbuf) }
+  | "break"     { BREAK }
   | "case"      { CASE }
   | "default"   { DEFAULT }
   | "else"      { ELSE }
   | "enum"      { ENUM }
   | "extension" { EXTENSION }
+  | "extern"    { EXTERN }
   | "for"       { FOR }
   | "func"      { FUNC }
   | "if"        { IF }
@@ -124,6 +126,8 @@ rule read =
   | "struct"    { STRUCT }
   | "switch"    { SWITCH }
   | "tailrec"   { TAILREC }
+  | "typealias" { TYPEALIAS }
+  | "typeswitch" { TYPESWITCH }
   | "when"      { WHEN }
   | "var"       { VAR }
   | "false"     { FALSE (to_loc lexbuf) }
@@ -131,7 +135,6 @@ rule read =
   | "#new"      { HASH_NEW }
   | "@go"       { AT_GO }
   | "@import"   { AT_IMPORT }
-  | "@native"   { AT_NATIVE }
   | ident       { IDENT (to_word lexbuf) }
   | _           { raise (Syntax_error (start_pos lexbuf, "Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof         { EOF }
