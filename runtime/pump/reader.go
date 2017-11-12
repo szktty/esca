@@ -8,29 +8,6 @@ import (
 	"strings"
 )
 
-func escaVarName(name string) string {
-	buf := bytes.NewBufferString("")
-	head := true
-	lower := strings.ToLower(name)
-	for i, c := range name {
-		if head {
-			if name[i] == lower[i] {
-				buf.WriteRune(c)
-				head = false
-			} else {
-				buf.WriteByte(lower[i])
-			}
-		} else {
-			buf.WriteRune(c)
-		}
-	}
-	return buf.String()
-}
-
-func mapAnnot(name string) string {
-	return fmt.Sprintf("@go(%s)", name)
-}
-
 func isPublicName(name string) bool {
 	return name[0] == strings.ToUpper(name)[0]
 }
@@ -196,17 +173,14 @@ func (r *Reader) writef(format string, a ...interface{}) {
 
 func (r *Reader) ReadStructType(value interface{}) {
 	ty := reflect.TypeOf(value)
-	r.writef("struct %s {\n", ty.Name())
+	r.writef("extern struct %s {\n", ty.Name())
 
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		if !isPublicName(field.Name) {
 			continue
 		}
-		r.writef("    %s var %s: %s\n",
-			mapAnnot(field.Name),
-			escaVarName(field.Name),
-			typeExpr(field.Type))
+		r.writef("    var %s: %s\n", field.Name, typeExpr(field.Type))
 	}
 
 	r.writef("}\n\n")
@@ -238,13 +212,12 @@ func (r *Reader) ReadMethodType(name string, value interface{}, params []string)
 
 func (r *Reader) outputMethod(method method) {
 	ty := method.ty
-	escaName := escaVarName(method.name)
 	ptr := ""
 	recvTy := ty.In(0)
 	if recvTy.Kind() == reflect.Ptr {
 		ptr = "*"
 	}
-	r.writef("    @native %s func %s(%sself", mapAnnot(method.name), escaName, ptr)
+	r.writef("    extern func %s(%sself", method.name, ptr)
 
 	numIn := ty.NumIn()
 	if numIn > 1 {
@@ -265,8 +238,7 @@ func (r *Reader) outputMethod(method method) {
 
 func (r *Reader) ReadFuncType(name string, value interface{}, params []string) {
 	ty := reflect.TypeOf(value)
-	escaName := escaVarName(name)
-	r.writef("@native %s func %s(", mapAnnot(name), escaName)
+	r.writef("extern func %s(", name)
 
 	numIn := ty.NumIn()
 	for i := 0; i < numIn; i++ {
