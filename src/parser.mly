@@ -215,15 +215,23 @@ rev_exp_list:
 go_attr:
   | AT_GO LPAREN IDENT RPAREN { `Go_attr $3 }
 
+struct_prefix:
+  | STRUCT { [] }
+  | EXTERN STRUCT { [`Extern] }
+
 struct_def:
-  | STRUCT IDENT LBRACE RBRACE
-  { `Strdef { sdef_name = $2;
+  | struct_prefix IDENT LBRACE RBRACE
+  { `Strdef {
+      sdef_quals = $1;
+      sdef_name = $2;
       sdef_items = [];
       sdef_type = Type.metavar None;
     }
   }
-  | STRUCT IDENT LBRACE field_def_list RBRACE
-  { `Strdef { sdef_name = $2;
+  | struct_prefix IDENT LBRACE field_def_list RBRACE
+  { `Strdef {
+      sdef_quals = $1;
+      sdef_name = $2;
       sdef_items = $4;
       sdef_type = Type.metavar None;
     }
