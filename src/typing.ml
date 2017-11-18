@@ -269,6 +269,8 @@ let rec infer (e:Ast.t)
         in
         (env, desc_void)
 
+      | `Import_attr _ -> env, void.desc
+
       | `Return e ->
         let ty = Option.value_map e
             ~default:Type.void

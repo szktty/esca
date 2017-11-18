@@ -67,6 +67,11 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     write_nodes chunk.ch_attrs;
     write_nodes chunk.ch_stats;
     add_string ")"
+  | `Import_attr (path, pkg) ->
+    add_string "(@import ";
+    write_text path;
+    write_text pkg;
+    add_string ")"
   | `Package name ->
     add_string "(package ";
     write_text name;

@@ -162,8 +162,7 @@ func NewReader(path string, name string) *Reader {
 		Name:    name,
 		Methods: map[string][]method{},
 		buf:     bytes.NewBufferString("")}
-	r.writef("@import(\"%s\")\n\n", path)
-	r.writef("package %s\n\n", name)
+	r.writef("@import(\"%s\", \"%s\")\n\n", path, name)
 	return r
 }
 

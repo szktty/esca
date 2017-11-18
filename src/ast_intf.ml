@@ -45,7 +45,7 @@ and tyexp_desc =
 type t = [
   | `Nop of Location.t (* internal use *)
   | `Chunk of chunk
-  | `Import_attr of text
+  | `Import_attr of text * text
   | `Go_attr of text
   | `Package of text
   | `Extension of extension

@@ -31,6 +31,7 @@ module Op = struct
 
   type t =
     | Nop
+    | Import of string * string
     | Fundef of fundef
     | Vardef of vardef
     | Assign of assign
@@ -298,6 +299,7 @@ module Compiler = struct
           ~f:(fun (ctx, funs) node ->
               let ctx, op = compile_node ctx node in
               match op with
+              | Nop | Import _ -> ctx, funs
               | Fundef def ->
                 let func = Closure.of_fundef def in
                 ctx, func :: funs
@@ -312,6 +314,9 @@ module Compiler = struct
                           ~funs
                           ~used_mods:ctx.used_mods);
       ctx, Nop
+
+    | `Import_attr (path, pkg) ->
+      ctx, Import (path.desc, pkg.desc)
 
     | `Package name ->
       { ctx with package = Some name.desc }, Nop
