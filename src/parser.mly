@@ -142,8 +142,9 @@ rev_attr_list:
   | rev_attr_list SEMI attr { $3 :: $1 }
 
 attr:
-  | AT_IMPORT LPAREN STRING RPAREN { `Import_attr $3 }
   | PACKAGE IDENT { `Package $2 }
+  | AT_IMPORT LPAREN STRING COMMA STRING RPAREN
+  { `Import_attr ($3, $5) }
 
 top_stat_list:
   | rev_top_stat_list { Core.Std.List.rev $1 }
