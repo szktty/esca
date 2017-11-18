@@ -136,6 +136,7 @@ and fundecl = {
 }
 
 and strdef = {
+  sdef_quals : [`Extern] list;
   sdef_name : text;
   sdef_items : t list;
   sdef_type : Type.t;
