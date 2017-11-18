@@ -72,9 +72,6 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
     write_text path;
     write_text pkg;
     add_string ")"
-  | `Package name ->
-    add_string "(package ";
-    write_text name;
     add_string ")"
   | `Vardef vdef ->
     add_string "(vardef ";
