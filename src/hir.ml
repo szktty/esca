@@ -318,9 +318,6 @@ module Compiler = struct
     | `Import_attr (path, pkg) ->
       ctx, Import (path.desc, pkg.desc)
 
-    | `Package name ->
-      { ctx with package = Some name.desc }, Nop
-
     | `Fundef def ->
       Printf.printf "HIR: compile fundef\n";
       Ast.print node;
