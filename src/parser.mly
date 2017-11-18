@@ -89,7 +89,6 @@ let create_unexp op_loc op exp =
 %token LSL                          (* "lsl" *)
 %token LSR                          (* "lsr" *)
 %token LXOR                         (* "lxor" *)
-%token PACKAGE                      (* "package" *)
 %token PUBLIC                       (* "public" *)
 %token RETURN                       (* "return" *)
 %token SELF                         (* "self" *)
@@ -142,7 +141,6 @@ rev_attr_list:
   | rev_attr_list SEMI attr { $3 :: $1 }
 
 attr:
-  | PACKAGE IDENT { `Package $2 }
   | AT_IMPORT LPAREN STRING COMMA STRING RPAREN
   { `Import_attr ($3, $5) }
 

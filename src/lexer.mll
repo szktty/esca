@@ -119,7 +119,6 @@ rule read =
   | "lsl"       { LSL }
   | "lsr"       { LSR }
   | "lxor"      { LXOR }
-  | "package"   { PACKAGE }
   | "public"    { PUBLIC }
   | "return"    { RETURN }
   | "self"      { SELF }
