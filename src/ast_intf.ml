@@ -47,6 +47,7 @@ type t = [
   | `Chunk of chunk
   | `Import_attr of text * text
   | `Go_attr of text
+  | `Import of text list
   | `Extension of extension
   | `Vardef of vardef
   | `Assign of assign

@@ -112,6 +112,7 @@ rule read =
   | "for"       { FOR }
   | "func"      { FUNC }
   | "if"        { IF }
+  | "import"    { IMPORT }
   | "in"        { IN }
   | "land"      { LAND }
   | "let"       { LET }

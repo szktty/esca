@@ -82,6 +82,7 @@ let create_unexp op_loc op exp =
 %token FOR                          (* "for" *)
 %token FUNC                         (* "func" *)
 %token IF                           (* "if" *)
+%token IMPORT                       (* "import" *)
 %token IN                           (* "in" *)
 %token LAND                         (* "land" *)
 %token LET                          (* "let" *)
@@ -155,12 +156,23 @@ rev_top_stat_list:
 
 top_stat:
   | directive { $1 }
+  | import { $1 }
   | struct_def { $1 }
   | enum_def { $1 }
   | extension { $1 }
   | vardef { $1 }
   | fundef { $1 }
   | fundecl { $1 }
+
+import:
+  | IMPORT import_path { `Import $2 } 
+
+import_path:
+  | rev_import_path { List.rev $1 }
+
+rev_import_path:
+  | IDENT { [$1] }
+  | rev_import_path DOT IDENT { $3 :: $1 }
 
 block:
   | (* empty *) { [] }
