@@ -70,6 +70,7 @@ let rec write (buf:Buffer.t) (node:Ast_intf.t) =
   | `Import_attr (path, pkg) ->
     add_string "(@import ";
     write_text path;
+    add_string " ";
     write_text pkg;
     add_string ")"
   | `Import path ->
