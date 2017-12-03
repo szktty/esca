@@ -275,7 +275,7 @@ module Program = struct
       ~f:(fun m ->
           add_string buf @@ sprintf "%s \"%s\"\n"
             (Go.Name.import_name @@ Module.namepath m)
-            (Module.package m));
+            (Module.name m));
     add_string buf ")\n\n"
 
   and write_poly buf (poly:poly) =

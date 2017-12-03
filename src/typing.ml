@@ -250,7 +250,7 @@ let rec unify ~(ex:Type.t) ~(ac:Type.t) : unit =
   | _, _ ->
     raise (Unify_error { uniexn_ex = ex; uniexn_ac = ac })
 
-let owner = Ref.create (Module.create "dummy" ~package:"")
+let owner = Ref.create (Module.create "dummy")
 
 let rec infer (e:Ast.t) 
     ~(clos:Closure.t)
